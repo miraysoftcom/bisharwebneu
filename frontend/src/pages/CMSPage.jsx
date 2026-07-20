@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import Link from "next/link";
+import { useRouter } from "next/router";
 import axios from "axios";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "http://localhost:8000";
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 const API = `${BACKEND_URL}/api`;
 
 const FALLBACK_META = {
@@ -29,7 +30,8 @@ const FALLBACK_META = {
 };
 
 export default function CMSPage({ pageSlug }) {
-  const { slug } = useParams();
+  const router = useRouter();
+  const slug = Array.isArray(router.query.slug) ? router.query.slug[0] : router.query.slug;
   const cmsSlug = pageSlug || slug || "";
   const [page, setPage] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -107,10 +109,10 @@ export default function CMSPage({ pageSlug }) {
             Die angeforderte Seite ist nicht verfügbar oder wurde noch nicht veröffentlicht.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
-            <Link to="/" className="rounded-full bg-slate-900 px-5 py-3 text-[10px] font-black uppercase tracking-[0.2em] text-white transition hover:bg-slate-800">
+            <Link href="/" className="rounded-full bg-slate-900 px-5 py-3 text-[10px] font-black uppercase tracking-[0.2em] text-white transition hover:bg-slate-800">
               Zur Startseite
             </Link>
-            <Link to="/contact" className="rounded-full border border-slate-300 px-5 py-3 text-[10px] font-black uppercase tracking-[0.2em] text-slate-700 transition hover:bg-slate-100">
+            <Link href="/contact" className="rounded-full border border-slate-300 px-5 py-3 text-[10px] font-black uppercase tracking-[0.2em] text-slate-700 transition hover:bg-slate-100">
               Kontakt
             </Link>
           </div>

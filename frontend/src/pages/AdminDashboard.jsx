@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { LOGIN } from "@/constants/testIds";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "http://localhost:8000";
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 const API = `${BACKEND_URL}/api`;
 
 const DEFAULT_GLOBAL_SETTINGS = {

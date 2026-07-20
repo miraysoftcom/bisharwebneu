@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import Link from "next/link";
 import axios from "axios";
 import { ShieldCheck, Cookie, Settings2, Sparkles, X } from "lucide-react";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "http://localhost:8000";
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 const API = `${BACKEND_URL}/api`;
 const STORAGE_KEY = "swiss_platten_cookie_consent";
 
@@ -220,7 +220,7 @@ export default function CookieConsentBanner({ hidden = false }) {
 
             <div className="flex flex-wrap items-center gap-3 text-[10px] font-black uppercase tracking-[0.2em] text-slate-300">
               {settings.show_preferences_link !== false && (
-                <Link to={settings.policy_link_url || "/cookie-einstellungen"} className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 transition hover:border-[#C5A880]/35 hover:text-white">
+                <Link href={settings.policy_link_url || "/cookie-einstellungen"} className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 transition hover:border-[#C5A880]/35 hover:text-white">
                   <Settings2 className="h-4 w-4 text-[#C5A880]" />
                   {settings.policy_link_text || "Cookie-Einstellungen"}
                 </Link>

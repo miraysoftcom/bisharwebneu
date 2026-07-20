@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useRouter } from "next/router";
 import axios from "axios";
 import { useLanguage } from "@/components/LanguageContext";
 import { 
@@ -8,12 +8,12 @@ import {
 } from "lucide-react";
 import { QUOTE } from "@/constants/testIds";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "http://localhost:8000";
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 const API = `${BACKEND_URL}/api`;
 
 export default function QuoteRequest() {
   const { t, lang } = useLanguage();
-  const navigate = useNavigate();
+  const router = useRouter();
 
   // Wizard Steps (1-8)
   const [step, setStep] = useState(1);

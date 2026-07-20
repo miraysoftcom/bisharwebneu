@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from "react";
-import { Link, useNavigate, useLocation } from "react-router-dom";
+import Link from "next/link";
+import { useRouter } from "next/router";
 import { useLanguage } from "@/components/LanguageContext";
 import { useAuth } from "@/components/AuthContext";
 import { Menu, X, Phone, Shield, Sparkles, ArrowRight } from "lucide-react";
 import { NAV } from "@/constants/testIds";
 import axios from "axios";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "http://localhost:8000";
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 const API = `${BACKEND_URL}/api`;
 
 export default function GlassHeader() {
@@ -16,8 +17,8 @@ export default function GlassHeader() {
   const [headerBanners, setHeaderBanners] = useState([]);
   const [globalBanners, setGlobalBanners] = useState([]);
   const [siteSettings, setSiteSettings] = useState(null);
-  const navigate = useNavigate();
-  const location = useLocation();
+  const router = useRouter();
+  const location = router.asPath.split("?")[0];
 
   useEffect(() => {
     // Fetch active banners
@@ -145,7 +146,7 @@ export default function GlassHeader() {
               SIA CERTIFIED CHAMPION
             </span>
             {user && (
-              <Link to="/admin" data-testid={NAV.adminDashboard} className="flex items-center space-x-1 hover:text-[#C5A880] transition-colors font-bold tracking-wider text-[10px] uppercase">
+              <Link href="/admin" data-testid={NAV.adminDashboard} className="flex items-center space-x-1 hover:text-[#C5A880] transition-colors font-bold tracking-wider text-[10px] uppercase">
                 <Shield className="w-3 h-3 text-[#C5A880]" />
                 <span>Admin</span>
               </Link>
@@ -156,7 +157,7 @@ export default function GlassHeader() {
         {/* Main Navigation Bar */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 min-h-22 py-4 flex items-center justify-between gap-4">
           {/* Logo */}
-          <Link to="/" className="group min-w-0">
+          <Link href="/" className="group min-w-0">
             {renderLogo(true)}
           </Link>
 
@@ -165,10 +166,10 @@ export default function GlassHeader() {
             {navItems.map((item) => (
               <Link
                 key={item.path}
-                to={item.path}
+                href={item.path}
                 data-testid={item.path === "/" ? NAV.home : `nav-${item.path.slice(1)}-link`}
                 className={`text-[11px] font-black uppercase tracking-widest transition-colors hover:text-[#C5A880] py-2 ${
-                  location.pathname === item.path ? "text-[#C5A880] border-b border-[#C5A880]" : "text-slate-800"
+                  location === item.path ? "text-[#C5A880] border-b border-[#C5A880]" : "text-slate-800"
                 }`}
               >
                 {item.name}
@@ -179,7 +180,7 @@ export default function GlassHeader() {
           {/* CTA */}
           <div className="hidden lg:flex items-center space-x-6">
             <button
-              onClick={() => navigate("/quote-request")}
+              onClick={() => router.push("/quote-request")}
               data-testid={NAV.quoteCta}
               className="group inline-flex items-center gap-3 rounded-full border border-[#C5A880]/30 bg-[linear-gradient(135deg,#111418_0%,#1C222A_55%,#0F172A_100%)] px-5 py-3 text-left text-white shadow-[0_12px_30px_-15px_rgba(0,0,0,0.6)] transition-all duration-300 hover:-translate-y-0.5 hover:border-[#C5A880]/50 hover:shadow-[0_18px_45px_-18px_rgba(197,168,128,0.45)] active:scale-[0.98]"
             >
@@ -195,7 +196,7 @@ export default function GlassHeader() {
 
           {/* Mobile menu button */}
           <div className="flex lg:hidden items-center space-x-4">
-            <Link to="/quote-request" className="hidden sm:inline-flex items-center gap-2 rounded-full border border-[#C5A880]/25 bg-[linear-gradient(135deg,#111418_0%,#1C222A_55%,#0F172A_100%)] px-4 py-2 text-[10px] font-black uppercase tracking-[0.22em] text-white shadow-[0_12px_30px_-15px_rgba(0,0,0,0.55)]">
+            <Link href="/quote-request" className="hidden sm:inline-flex items-center gap-2 rounded-full border border-[#C5A880]/25 bg-[linear-gradient(135deg,#111418_0%,#1C222A_55%,#0F172A_100%)] px-4 py-2 text-[10px] font-black uppercase tracking-[0.22em] text-white shadow-[0_12px_30px_-15px_rgba(0,0,0,0.55)]">
               <ArrowRight className="h-4 w-4 text-[#C5A880]" />
               <span>{t("nav.requestQuote")}</span>
             </Link>
@@ -215,10 +216,10 @@ export default function GlassHeader() {
               {navItems.map((item) => (
                 <Link
                   key={item.path}
-                  to={item.path}
+                  href={item.path}
                   onClick={() => setMobileOpen(false)}
                   className={`text-xs font-black tracking-widest uppercase transition-colors ${
-                    location.pathname === item.path ? "text-[#C5A880]" : "text-slate-800"
+                    location === item.path ? "text-[#C5A880]" : "text-slate-800"
                   }`}
                 >
                   {item.name}
@@ -226,7 +227,7 @@ export default function GlassHeader() {
               ))}
               {user && (
                 <Link
-                  to="/admin"
+                  href="/admin"
                   onClick={() => setMobileOpen(false)}
                   className="text-xs font-black tracking-widest uppercase text-slate-800 flex items-center space-x-1"
                 >
@@ -237,7 +238,7 @@ export default function GlassHeader() {
               <button
                 onClick={() => {
                   setMobileOpen(false);
-                  navigate("/quote-request");
+                  router.push("/quote-request");
                 }}
                 className="w-full text-center bg-slate-900 text-white font-extrabold text-[10px] tracking-widest uppercase py-3.5 border border-[#C5A880]/30 rounded-full"
               >

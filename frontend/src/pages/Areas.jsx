@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useRouter } from "next/router";
 import axios from "axios";
 import { useLanguage } from "@/components/LanguageContext";
 import { MapPin, Search, CheckCircle2, AlertTriangle, ArrowRight, HelpCircle } from "lucide-react";
@@ -8,7 +8,7 @@ const API = "/api";
 
 export default function Areas() {
   const { t } = useLanguage();
-  const navigate = useNavigate();
+  const router = useRouter();
   const [areas, setAreas] = useState([]);
   const [postalCode, setPostalCode] = useState("");
   const [postcodeCheck, setPostcodeCheck] = useState({ checked: false, allowed: false, message: "" });
@@ -55,7 +55,7 @@ export default function Areas() {
     sessionStorage.setItem("preselected_zip", pc);
     sessionStorage.setItem("preselected_city", area.city);
     sessionStorage.setItem("preselected_region", area.name);
-    navigate("/quote-request");
+    router.push("/quote-request");
   };
 
   return (
@@ -118,7 +118,7 @@ export default function Areas() {
                   <button 
                     onClick={() => {
                       sessionStorage.setItem("preselected_zip", postalCode);
-                      navigate("/quote-request");
+                      router.push("/quote-request");
                     }}
                     className="mt-3 text-xs font-bold text-green-700 hover:text-green-800 underline block"
                   >

@@ -1,20 +1,21 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useRouter } from "next/router";
 import axios from "axios";
 import { ArrowRight, MapPin, CheckCircle2, Home } from "lucide-react";
 
 const API = "/api";
 
 export default function ServiceAreaDetail() {
-  const { slug } = useParams();
-  const navigate = useNavigate();
+  const router = useRouter();
+  const slug = Array.isArray(router.query.slug) ? router.query.slug[0] : router.query.slug;
   const [area, setArea] = useState(null);
 
   useEffect(() => {
+    if (!router.isReady || !slug) return;
     axios.get(`${API}/service-areas/slug/${slug}`)
       .then((res) => setArea(res.data))
       .catch(() => setArea(null));
-  }, [slug]);
+  }, [slug, router.isReady]);
 
   if (!area) {
     return (
@@ -31,11 +32,11 @@ export default function ServiceAreaDetail() {
     <div className="min-h-screen bg-[#FAF9F6]">
       <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:px-8">
         <nav className="mb-8 flex items-center gap-2 text-sm text-slate-500">
-          <button onClick={() => navigate("/")} className="inline-flex items-center gap-2 font-semibold hover:text-slate-800">
+          <button onClick={() => router.push("/")} className="inline-flex items-center gap-2 font-semibold hover:text-slate-800">
             <Home className="h-4 w-4" /> Startseite
           </button>
           <span>/</span>
-          <button onClick={() => navigate("/areas")} className="font-semibold hover:text-slate-800">Einsatzgebiete</button>
+          <button onClick={() => router.push("/areas")} className="font-semibold hover:text-slate-800">Einsatzgebiete</button>
           <span>/</span>
           <span className="font-semibold text-slate-800">{area.name}</span>
         </nav>
@@ -46,10 +47,10 @@ export default function ServiceAreaDetail() {
             <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-900">{area.name}</h1>
             <p className="mt-6 text-lg leading-relaxed text-slate-600">{area.description}</p>
             <div className="mt-8 flex flex-wrap gap-3">
-              <button onClick={() => navigate("/quote-request")} className="rounded-full bg-slate-900 px-5 py-3 text-[10px] font-black uppercase tracking-[0.2em] text-white transition hover:bg-slate-800">
+              <button onClick={() => router.push("/quote-request")} className="rounded-full bg-slate-900 px-5 py-3 text-[10px] font-black uppercase tracking-[0.2em] text-white transition hover:bg-slate-800">
                 Offerte anfragen
               </button>
-              <button onClick={() => navigate("/areas")} className="rounded-full border border-slate-300 px-5 py-3 text-[10px] font-black uppercase tracking-[0.2em] text-slate-700 transition hover:bg-slate-100">
+              <button onClick={() => router.push("/areas")} className="rounded-full border border-slate-300 px-5 py-3 text-[10px] font-black uppercase tracking-[0.2em] text-slate-700 transition hover:bg-slate-100">
                 Alle Regionen
               </button>
             </div>

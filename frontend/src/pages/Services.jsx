@@ -1,15 +1,15 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useRouter } from "next/router";
 import { useLanguage } from "@/components/LanguageContext";
 import { Shield, Check, ArrowRight, CornerDownRight, Layers, Paintbrush, Flame, Hammer, Sparkles } from "lucide-react";
 import axios from "axios";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "http://localhost:8000";
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 const API = `${BACKEND_URL}/api`;
 
 export default function Services() {
   const { t } = useLanguage();
-  const navigate = useNavigate();
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState("bodenplatten");
   const [serviceTopBanners, setServiceTopBanners] = useState([]);
 
@@ -58,7 +58,7 @@ export default function Services() {
   const handleRequestQuote = (serviceName) => {
     // Pre-select service in quote system by storing in state or session
     sessionStorage.setItem("preselected_service", serviceName);
-    navigate("/quote-request");
+    router.push("/quote-request");
   };
 
   return (
@@ -78,7 +78,7 @@ export default function Services() {
               </div>
               {banner.btn_text && (
                 <button
-                  onClick={() => navigate(banner.btn_link || "/quote-request")}
+                  onClick={() => router.push(banner.btn_link || "/quote-request")}
                   className="rounded-full bg-white/15 border border-white/20 px-4 py-2 text-[10px] font-black uppercase tracking-[0.2em] hover:bg-white/25"
                 >
                   {banner.btn_text}

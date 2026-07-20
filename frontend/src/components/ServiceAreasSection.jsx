@@ -1,12 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useRouter } from "next/router";
 import axios from "axios";
 import { ArrowRight, MapPin, CheckCircle2, AlertTriangle } from "lucide-react";
 
 const API = "/api";
 
 export default function ServiceAreasSection() {
-  const navigate = useNavigate();
+  const router = useRouter();
   const [areas, setAreas] = useState([]);
   const [section, setSection] = useState(null);
   const [postcode, setPostcode] = useState("");
@@ -88,10 +88,10 @@ export default function ServiceAreasSection() {
                     ))}
                   </div>
                   <div className="mt-6 flex flex-wrap gap-3">
-                    <button onClick={() => navigate(`/einsatzgebiete/${area.slug}`)} className="rounded-full border border-slate-200 px-4 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-700 transition hover:border-slate-300 hover:bg-slate-50">
+                    <button onClick={() => router.push(`/einsatzgebiete/${area.slug}`)} className="rounded-full border border-slate-200 px-4 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-slate-700 transition hover:border-slate-300 hover:bg-slate-50">
                       Mehr erfahren
                     </button>
-                    <button onClick={() => { sessionStorage.setItem("preselected_region", area.name); navigate("/quote-request"); }} className="rounded-full px-4 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-white transition" style={{ backgroundColor: section?.accent_color || "#C5A880" }}>
+                    <button onClick={() => { sessionStorage.setItem("preselected_region", area.name); router.push("/quote-request"); }} className="rounded-full px-4 py-2 text-[10px] font-black uppercase tracking-[0.2em] text-white transition" style={{ backgroundColor: section?.accent_color || "#C5A880" }}>
                       Offerte anfragen
                     </button>
                   </div>
@@ -100,11 +100,11 @@ export default function ServiceAreasSection() {
             </div>
 
             <div className="flex flex-wrap items-center gap-4">
-              <button onClick={() => navigate("/areas")} className="inline-flex items-center gap-2 rounded-full border border-slate-300 px-5 py-3 text-[10px] font-black uppercase tracking-[0.2em] text-slate-700 transition hover:bg-slate-100">
+              <button onClick={() => router.push("/areas")} className="inline-flex items-center gap-2 rounded-full border border-slate-300 px-5 py-3 text-[10px] font-black uppercase tracking-[0.2em] text-slate-700 transition hover:bg-slate-100">
                 <span>Alle Einsatzgebiete</span>
                 <ArrowRight className="h-4 w-4" />
               </button>
-              <button onClick={() => navigate("/quote-request")} className="inline-flex items-center gap-2 rounded-full px-5 py-3 text-[10px] font-black uppercase tracking-[0.2em] text-white transition" style={{ backgroundColor: section?.accent_color || "#C5A880" }}>
+              <button onClick={() => router.push("/quote-request")} className="inline-flex items-center gap-2 rounded-full px-5 py-3 text-[10px] font-black uppercase tracking-[0.2em] text-white transition" style={{ backgroundColor: section?.accent_color || "#C5A880" }}>
                 <span>{section?.cta_text || "Offerte anfragen"}</span>
                 <ArrowRight className="h-4 w-4" />
               </button>

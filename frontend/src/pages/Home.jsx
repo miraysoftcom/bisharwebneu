@@ -1,17 +1,17 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useRouter } from "next/router";
 import axios from "axios";
 import { useLanguage } from "@/components/LanguageContext";
 import { Star, Shield, Award, ClipboardCheck, ArrowRight, CheckCircle2, ChevronRight, Split, Sparkles, ChevronLeft, Send, Loader2 } from "lucide-react";
 import { PORTFOLIO } from "@/constants/testIds";
 import ServiceAreasSection from "@/components/ServiceAreasSection";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "http://localhost:8000";
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 const API = `${BACKEND_URL}/api`;
 
 export default function Home() {
   const { t, lang } = useLanguage();
-  const navigate = useNavigate();
+  const router = useRouter();
   
   // Dynamic Slider states
   const [sliders, setSliders] = useState([]);
@@ -148,7 +148,7 @@ export default function Home() {
             </div>
             {banner.btn_text && (
               <button
-                onClick={() => navigate(banner.btn_link || "/quote-request")}
+                onClick={() => router.push(banner.btn_link || "/quote-request")}
                 className="rounded-full bg-white/15 border border-white/20 px-4 py-2 text-[10px] font-black uppercase tracking-[0.2em] hover:bg-white/25"
               >
                 {banner.btn_text}
@@ -206,7 +206,7 @@ export default function Home() {
                     <div className="flex flex-col sm:flex-row gap-4 pt-4">
                       {slide.btn1_text && (
                         <button
-                          onClick={() => navigate(slide.btn1_link || "/quote-request")}
+                          onClick={() => router.push(slide.btn1_link || "/quote-request")}
                           className="gold-btn font-extrabold text-[10px] tracking-widest uppercase px-8 py-4.5 rounded-sm"
                         >
                           {slide.btn1_text}
@@ -214,7 +214,7 @@ export default function Home() {
                       )}
                       {slide.btn2_text && (
                         <button
-                          onClick={() => navigate(slide.btn2_link || "/portfolio")}
+                          onClick={() => router.push(slide.btn2_link || "/portfolio")}
                           className="bg-transparent hover:bg-white/5 font-extrabold text-[10px] tracking-widest uppercase px-8 py-4.5 rounded-sm border border-[#C5A880]/30 text-white transition-all flex items-center justify-center space-x-2"
                         >
                           <span>{slide.btn2_text}</span>
@@ -253,13 +253,13 @@ export default function Home() {
 
                 <div className="flex flex-col sm:flex-row gap-4 pt-4">
                   <button
-                    onClick={() => navigate("/quote-request")}
+                    onClick={() => router.push("/quote-request")}
                     className="gold-btn font-extrabold text-[10px] tracking-widest uppercase px-8 py-4.5 rounded-sm shadow-2xl"
                   >
                     {t("hero.ctaQuote")}
                   </button>
                   <button
-                    onClick={() => navigate("/services")}
+                    onClick={() => router.push("/services")}
                     className="bg-transparent hover:bg-white/5 font-extrabold text-[10px] tracking-widest uppercase px-8 py-4.5 rounded-sm border border-[#C5A880]/30 text-white transition-all flex items-center justify-center space-x-2"
                   >
                     <span>{t("hero.ctaServices")}</span>
@@ -313,7 +313,7 @@ export default function Home() {
           </div>
           {b.btn_text && (
             <button 
-              onClick={() => navigate(b.btn_link || "/quote-request")}
+              onClick={() => router.push(b.btn_link || "/quote-request")}
               className="gold-btn font-extrabold text-[10px] tracking-widest uppercase px-6 py-3.5 rounded-sm"
             >
               {b.btn_text}
@@ -356,7 +356,7 @@ export default function Home() {
                   </div>
                   <div className="pt-8 border-t border-[#C5A880]/15 mt-8 flex justify-between items-center">
                     <button 
-                      onClick={() => navigate("/services")}
+                      onClick={() => router.push("/services")}
                       className="text-[10px] font-bold tracking-widest uppercase flex items-center space-x-1 hover:text-[#C5A880] transition-colors"
                     >
                       <span>ATELIER DETAILS</span>
@@ -380,7 +380,7 @@ export default function Home() {
                 </p>
               </div>
               <button
-                onClick={() => navigate("/quote-request")}
+                onClick={() => router.push("/quote-request")}
                 className="w-full mt-8 bg-gradient-to-r from-[#C5A880] to-[#9B8265] text-[#111418] font-black text-[10px] tracking-widest uppercase py-4 rounded-sm hover:shadow-lg transition-all"
               >
                 OFFERTE ANFORDERN
@@ -417,7 +417,7 @@ export default function Home() {
               </div>
 
               <button 
-                onClick={() => navigate("/portfolio")}
+                onClick={() => router.push("/portfolio")}
                 className="inline-flex items-center space-x-2 text-xs font-bold text-[#C5A880] hover:text-white transition-colors pt-4 uppercase tracking-widest"
               >
                 <span>PORTFOLIO BESUCHEN</span>

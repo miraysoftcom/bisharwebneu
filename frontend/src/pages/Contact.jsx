@@ -4,7 +4,7 @@ import { useLanguage } from "@/components/LanguageContext";
 import { Phone, Mail, Clock, MessageSquare, PhoneCall, CheckCircle2, AlertCircle, MapPin, ShieldCheck, Sparkles } from "lucide-react";
 import { CONTACT } from "@/constants/testIds";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "http://localhost:8000";
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 const API = `${BACKEND_URL}/api`;
 
 export default function Contact() {

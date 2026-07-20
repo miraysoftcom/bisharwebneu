@@ -2,14 +2,14 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { useLanguage } from "@/components/LanguageContext";
 import { Search, ChevronDown, ChevronUp, MessageCircle, HelpCircle, Sparkles } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useRouter } from "next/router";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "http://localhost:8000";
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 const API = `${BACKEND_URL}/api`;
 
 export default function FAQ() {
   const { t, lang } = useLanguage();
-  const navigate = useNavigate();
+  const router = useRouter();
   const [faqs, setFaqs] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
@@ -161,7 +161,7 @@ export default function FAQ() {
             <span className="text-sm font-bold text-slate-200">Wir beraten Sie gerne unverbindlich auch telefonisch oder vor Ort.</span>
           </div>
           <button 
-            onClick={() => navigate("/contact")}
+            onClick={() => router.push("/contact")}
             className="gold-btn font-extrabold text-[10px] tracking-widest uppercase px-6 py-3.5 rounded-sm"
           >
             Kontakt Aufnehmen

@@ -1,15 +1,14 @@
 import React, { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import Link from "next/link";
 import { useLanguage } from "@/components/LanguageContext";
 import { Phone, Mail, Clock, MapPin, Shield, Sparkles } from "lucide-react";
 import axios from "axios";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "http://localhost:8000";
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
 const API = `${BACKEND_URL}/api`;
 
 export default function CustomFooter() {
   const { t } = useLanguage();
-  const navigate = useNavigate();
   const [settings, setSettings] = useState(null);
 
   useEffect(() => {
@@ -45,7 +44,7 @@ export default function CustomFooter() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
           {/* Brand Col */}
           <div className="space-y-6">
-            <Link to="/" onClick={handleScrollTop} className="flex items-center space-x-3 group">
+            <Link href="/" onClick={handleScrollTop} className="flex items-center space-x-3 group">
               {getLogoMode() === "image" && getLogoImage() ? (
                 <>
                   <img
@@ -99,27 +98,27 @@ export default function CustomFooter() {
             </h4>
             <ul className="space-y-3 text-sm font-bold">
               <li>
-                <Link to="/services" onClick={handleScrollTop} className="hover:text-[#C5A880] transition-colors">
+                <Link href="/services" onClick={handleScrollTop} className="hover:text-[#C5A880] transition-colors">
                   Bodenplatten montieren
                 </Link>
               </li>
               <li>
-                <Link to="/services" onClick={handleScrollTop} className="hover:text-[#C5A880] transition-colors">
+                <Link href="/services" onClick={handleScrollTop} className="hover:text-[#C5A880] transition-colors">
                   Duschen & Nassbereiche
                 </Link>
               </li>
               <li>
-                <Link to="/services" onClick={handleScrollTop} className="hover:text-[#C5A880] transition-colors">
+                <Link href="/services" onClick={handleScrollTop} className="hover:text-[#C5A880] transition-colors">
                   Bodenschleifen & Spachteln
                 </Link>
               </li>
               <li>
-                <Link to="/services" onClick={handleScrollTop} className="hover:text-[#C5A880] transition-colors">
+                <Link href="/services" onClick={handleScrollTop} className="hover:text-[#C5A880] transition-colors">
                   Spezialabdichtungen
                 </Link>
               </li>
               <li>
-                <Link to="/services" onClick={handleScrollTop} className="hover:text-[#C5A880] transition-colors">
+                <Link href="/services" onClick={handleScrollTop} className="hover:text-[#C5A880] transition-colors">
                   Fugenarbeiten aller Art
                 </Link>
               </li>
@@ -193,19 +192,19 @@ export default function CustomFooter() {
         <div className="mt-16 pt-8 border-t border-slate-800 text-xs text-slate-500 flex flex-col sm:flex-row justify-between items-center gap-4">
           <p>© 2026 {getCompanyName()}. Alle Rechte vorbehalten. Schweizer Handwerks-Qualität. UID: {getUid()}</p>
           <div className="flex space-x-6">
-            <Link to="/impressum" onClick={handleScrollTop} className="hover:text-[#C5A880] transition-colors">
+            <Link href="/impressum" onClick={handleScrollTop} className="hover:text-[#C5A880] transition-colors">
               Impressum
             </Link>
-            <Link to="/datenschutz" onClick={handleScrollTop} className="hover:text-[#C5A880] transition-colors">
+            <Link href="/datenschutz" onClick={handleScrollTop} className="hover:text-[#C5A880] transition-colors">
               Datenschutz
             </Link>
-            <Link to="/agb" onClick={handleScrollTop} className="hover:text-[#C5A880] transition-colors">
+            <Link href="/agb" onClick={handleScrollTop} className="hover:text-[#C5A880] transition-colors">
               AGB
             </Link>
-            <Link to="/cookie-einstellungen" onClick={handleScrollTop} className="hover:text-[#C5A880] transition-colors">
+            <Link href="/cookie-einstellungen" onClick={handleScrollTop} className="hover:text-[#C5A880] transition-colors">
               Cookie-Einstellungen
             </Link>
-            <Link to="/admin" onClick={handleScrollTop} className="hover:text-[#C5A880] transition-colors font-semibold text-slate-400 flex items-center space-x-1">
+            <Link href="/admin" onClick={handleScrollTop} className="hover:text-[#C5A880] transition-colors font-semibold text-slate-400 flex items-center space-x-1">
               <Shield className="w-3.5 h-3.5 text-[#C5A880]" />
               <span>Admin</span>
             </Link>
