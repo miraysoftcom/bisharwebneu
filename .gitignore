@@ -22,7 +22,6 @@ node_modules/
 # Next.js
 /.next/
 /out/
-frontend/.next/
 next-env.d.ts
 *.tsbuildinfo
 
@@ -55,7 +54,6 @@ venv/
 
 # Development tools
 chainlit.md
-### AL ###
 .ipynb_checkpoints/
 .ac
 
@@ -94,7 +92,7 @@ android-sdk/
 credentials.json
 *.key
 .credentials
-=======
+
 ### AL ###
 #Template for AL projects for Dynamics 365 Business Central
 #launch.json folder
