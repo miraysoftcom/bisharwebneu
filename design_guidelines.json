@@ -1,0 +1,113 @@
+{
+  "theme_and_concept": {
+    "theme_mode": "light",
+    "rationale": "A light theme conveys cleanliness, precision, and trust, aligning with high-end Swiss architectural and construction standards. We blend the 'Swiss & High-Contrast' archetype with subtle 'Organic' tones for a premium, solid feel."
+  },
+  "typography": {
+    "strategy": "The 'Swiss Brutalist' approach: highly legible, modern geometric sans-serif for headings with high weight contrast (Light vs. Black), paired with a reliable geometric body font.",
+    "heading_font": "Outfit",
+    "body_font": "Inter",
+    "scale_rules": {
+      "h1": "text-5xl sm:text-6xl tracking-tighter leading-none font-medium",
+      "h2": "text-3xl sm:text-4xl tracking-tight leading-tight font-medium",
+      "h3": "text-xl sm:text-2xl tracking-tight font-medium",
+      "body": "text-base leading-relaxed text-slate-600",
+      "labels": "text-xs font-semibold uppercase tracking-[0.2em] text-slate-500"
+    }
+  },
+  "colors": {
+    "palette_name": "Swiss Architecture",
+    "primary": {
+      "DEFAULT": "#D92D20",
+      "foreground": "#FFFFFF",
+      "hover": "#B9251A",
+      "description": "Signal Red - evokes Swiss precision, draws immediate attention for CTAs (Offerte anfordern)."
+    },
+    "secondary": {
+      "DEFAULT": "#1E2328",
+      "foreground": "#FFFFFF",
+      "hover": "#2B3238",
+      "description": "Deep Slate - used for heavy contrast sections, footers, and secondary buttons."
+    },
+    "background": {
+      "app": "#F9F9F8",
+      "surface": "#FFFFFF",
+      "dashboard": "#F4F4F3"
+    },
+    "text": {
+      "main": "#111418",
+      "muted": "#64748B"
+    },
+    "borders": "#E2E8F0"
+  },
+  "spacing_and_layout": {
+    "philosophy": "Generous Spacing (p-8 to p-24 for sections). Containers with borders must have internal padding (p-6 or p-8).",
+    "grids": {
+      "marketing": "Mode A: 'Tetris' Grid (gap-8 to gap-12, col-span mixing for asymmetry) for the Services and Portfolio sections.",
+      "dashboard": "Mode B: High Density Grid (gap-6, full-height widgets) for the Admin panel."
+    },
+    "alignment": "Optical alignment over geometrical. Left-align dense content and forms. Hero content can be left-aligned for a modern, editorial look."
+  },
+  "surfaces_and_materials": {
+    "header": "Crystal Glass: backdrop-blur-xl bg-white/70 with a delicate 1px border-b border-slate-200. Must have z-50.",
+    "cards_marketing": "Flat solid surfaces with subtle 1px border (border-slate-200) and no shadow by default. Hover adds shadow-lg and -translate-y-1.",
+    "dashboard_widgets": "Neumorphic tactile variant: Flat background (white), 1px subtle border, sharp inner contrasts.",
+    "hero_overlay": "bg-black/40 overlay to ensure text contrast while keeping the architectural image visible."
+  },
+  "components": {
+    "buttons": "Sharp or slightly rounded corners (rounded-md), modern interaction animations (active:scale-95). Do not use pill-shape to maintain architectural rigidity.",
+    "forms_offertensystem": "Shadcn components heavily customized to match the brand. Use Stepper/Tabs for multi-step. Clean, solid white cards for form steps. No generic inputs.",
+    "toast": "Use 'sonner' for toast notifications (e.g., Quote submitted successfully)."
+  },
+  "motion_and_interactions": {
+    "philosophy": "Subtle, professional, avoiding bouncy effects.",
+    "hover": "Explicit hover states on all interactives (e.g., hover:bg-slate-900 hover:text-white).",
+    "transitions": "Specific transitions (transition-colors duration-200, transition-transform duration-300). DO NOT use 'transition: all'.",
+    "page_load": "Staggered fade-up for grid items and form steps."
+  },
+  "images_and_media": {
+    "strategy": "High-quality, realistic construction and architectural photography. No abstract shapes for services.",
+    "hero": {
+      "url": "https://images.pexels.com/photos/10298352/pexels-photo-10298352.jpeg",
+      "alt": "Modern building facade featuring geometric glass panels"
+    },
+    "services": [
+      {
+        "category": "Plattenleger / Tiling",
+        "url": "https://images.pexels.com/photos/7018379/pexels-photo-7018379.jpeg",
+        "alt": "Contemporary bathroom interior with tiled walls"
+      },
+      {
+        "category": "Bodenleger / Flooring",
+        "url": "https://images.pexels.com/photos/1388944/floor-flooring-hand-man-1388944.jpeg",
+        "alt": "Craftsman carefully measures wooden floor panels"
+      },
+      {
+        "category": "Abdichtung / Waterproofing",
+        "url": "https://images.unsplash.com/photo-1589939705384-5185137a7f0f",
+        "alt": "Professional construction worker with power tool"
+      }
+    ],
+    "team_trust": {
+      "url": "https://images.pexels.com/photos/901941/pexels-photo-901941.jpeg",
+      "alt": "Construction workers standing outdoors at building site"
+    }
+  },
+  "3d_and_visual_enhancers": {
+    "strategy": "Minimal 3D to keep it professional. Focus on high-end 2D photography and crisp typography.",
+    "libraries": "Framer Motion for scroll animations (fade in, parallax). Lucide React for crisp, consistent iconography."
+  },
+  "accessibility_and_testing": {
+    "contrast": "Ensure all text over images uses text-shadow or gradient overlays. Minimum 4.5:1 for standard text.",
+    "testing_attributes": "All interactive elements (buttons, inputs, steps) MUST include 'data-testid' (e.g., 'data-testid=\"offerte-submit-btn\"')."
+  },
+  "universal_guidelines_for_main_agent": [
+    "You MUST NOT apply universal transition (e.g., 'transition: all').",
+    "You MUST NOT center align the app container (.App { text-align: center; }).",
+    "Never use placeholder URLs (via.placeholder.com). Use the provided image URLs.",
+    "Create depth through layered design elements with z-index hierarchy.",
+    "Avoid generic centered layouts; use 'Tetris' bento grids for marketing sections.",
+    "Use Lucide-react for all icons, keeping stroke-width consistent (typically 1.5).",
+    "Form inputs must have clear focus states (focus:ring-2 focus:ring-primary focus:outline-none)."
+  ]
+}
