@@ -286,7 +286,36 @@ sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-## 10. Firewall
+## 10. HTTPS (Let's Encrypt + certbot)
+
+Nginx reverse proxy aktif olduktan sonra HTTPS sertifikasi alin.
+
+### 10.1 Debian/Ubuntu
+
+```bash
+sudo apt update
+sudo apt install -y certbot python3-certbot-nginx
+sudo certbot --nginx -d example.com -d www.example.com
+```
+
+### 10.2 AlmaLinux
+
+```bash
+sudo dnf install -y epel-release
+sudo dnf install -y certbot python3-certbot-nginx
+sudo certbot --nginx -d example.com -d www.example.com
+```
+
+### 10.3 Otomatik yenileme kontrolu
+
+```bash
+sudo systemctl status certbot.timer --no-pager
+sudo certbot renew --dry-run
+```
+
+Nginx config icinde certbot tarafindan otomatik HTTPS block olusur. Son durumda site sadece `https://` ile servis edilmelidir.
+
+## 11. Firewall
 
 Ubuntu/Debian (UFW):
 
@@ -305,7 +334,7 @@ sudo firewall-cmd --permanent --add-service=https
 sudo firewall-cmd --reload
 ```
 
-## 11. Sik sorunlar
+## 12. Sik sorunlar
 
 ### 11.1 Mongo baglantisi yok (`localhost:27017 refused`)
 
@@ -331,7 +360,7 @@ lsof -ti tcp:3000 | xargs -r kill -9
 lsof -ti tcp:8000 | xargs -r kill -9
 ```
 
-## 12. Hızlı kontrol listesi
+## 13. Hizli kontrol listesi
 
 - Mongo aktif mi?
 - Backend `:8000` acik mi?
