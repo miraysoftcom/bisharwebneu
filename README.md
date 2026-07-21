@@ -31,8 +31,12 @@ npm run dev -- --port 3000
 - Frontend: http://localhost:3000
 - Backend docs: http://localhost:8000/docs
 
-## Linux Kurulum Kılavuzu
+## Linux Kurulum Kılavuzları
 
-Debian, Ubuntu ve AlmaLinux için adım adım üretim kurulum rehberi:
+Aşağıdaki ayrı rehberleri sırasıyla takip edebilirsin:
 
-- docs/INSTALL_LINUX.md
+- Debian: docs/INSTALL_DEBIAN.md
+- Ubuntu: docs/INSTALL_UBUNTU.md
+- AlmaLinux: docs/INSTALL_ALMALINUX.md
+- Genel adım adım özet: docs/INSTALL_LINUX_STEP_BY_STEP.md
+- Eski genel rehber: docs/INSTALL_LINUX.md

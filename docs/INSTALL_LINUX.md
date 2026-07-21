@@ -1,6 +1,11 @@
 # Bisharwebsite Kurulum ve Kullanım Kılavuzu (Debian, Ubuntu, AlmaLinux)
 
-Bu dokuman, projeyi Linux sunucuda calistirmak icin adim adim kurulum talimatlarini icerir.
+Bu dokuman genel bir rehber niteliğindedir. Daha kolay takip etmek için distro bazlı rehberleri de kullanabilirsin:
+
+- Debian: [INSTALL_DEBIAN.md](INSTALL_DEBIAN.md)
+- Ubuntu: [INSTALL_UBUNTU.md](INSTALL_UBUNTU.md)
+- AlmaLinux: [INSTALL_ALMALINUX.md](INSTALL_ALMALINUX.md)
+- Adım adım kısa rehber: [INSTALL_LINUX_STEP_BY_STEP.md](INSTALL_LINUX_STEP_BY_STEP.md)
 
 ## 1. Mimari Ozeti
 
@@ -315,6 +320,78 @@ sudo certbot renew --dry-run
 
 Nginx config icinde certbot tarafindan otomatik HTTPS block olusur. Son durumda site sadece `https://` ile servis edilmelidir.
 
+### 10.4 Production Nginx HTTPS config (hardening)
+
+Asagidaki ornek, certbot sertifikalari olustuktan sonra guvenlik basliklari ve performans ayarlari ile birlikte kullanilabilir.
+
+`/etc/nginx/conf.d/bishar-ssl.conf`
+
+```nginx
+server {
+  listen 80;
+  server_name example.com www.example.com;
+  return 301 https://$host$request_uri;
+}
+
+server {
+  listen 443 ssl http2;
+  server_name example.com www.example.com;
+
+  ssl_certificate /etc/letsencrypt/live/example.com/fullchain.pem;
+  ssl_certificate_key /etc/letsencrypt/live/example.com/privkey.pem;
+  ssl_protocols TLSv1.2 TLSv1.3;
+  ssl_prefer_server_ciphers on;
+  ssl_session_cache shared:SSL:10m;
+  ssl_session_timeout 1d;
+
+  add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+  add_header X-Frame-Options "SAMEORIGIN" always;
+  add_header X-Content-Type-Options "nosniff" always;
+  add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+  add_header Permissions-Policy "geolocation=(), microphone=(), camera=()" always;
+
+  gzip on;
+  gzip_comp_level 5;
+  gzip_min_length 1024;
+  gzip_types text/plain text/css application/javascript application/json application/xml image/svg+xml;
+
+  client_max_body_size 20M;
+
+  location /api/ {
+    proxy_pass http://127.0.0.1:8000/api/;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+  }
+
+  location /_next/static/ {
+    proxy_pass http://127.0.0.1:3000;
+    expires 30d;
+    add_header Cache-Control "public, max-age=2592000, immutable";
+  }
+
+  location / {
+    proxy_pass http://127.0.0.1:3000;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+  }
+}
+```
+
+Uygula:
+
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
 ## 11. Firewall
 
 Ubuntu/Debian (UFW):
@@ -336,14 +413,14 @@ sudo firewall-cmd --reload
 
 ## 12. Sik sorunlar
 
-### 11.1 Mongo baglantisi yok (`localhost:27017 refused`)
+### 12.1 Mongo baglantisi yok (`localhost:27017 refused`)
 
 ```bash
 sudo systemctl status mongod --no-pager
 sudo systemctl restart mongod
 ```
 
-### 11.2 Frontend `next: command not found`
+### 12.2 Frontend `next: command not found`
 
 `frontend` klasorunde oldugunuzdan emin olun:
 
@@ -353,7 +430,7 @@ npm install --legacy-peer-deps
 npm run dev
 ```
 
-### 11.3 Port cakismasi
+### 12.3 Port cakismasi
 
 ```bash
 lsof -ti tcp:3000 | xargs -r kill -9
