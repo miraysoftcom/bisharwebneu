@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { useAuth } from "@/components/AuthContext";
 import { useLanguage } from "@/components/LanguageContext";
@@ -33,6 +33,10 @@ const DEFAULT_GLOBAL_SETTINGS = {
     port: 587,
     username: "smtp_user",
     password: "password_placeholder",
+    from_email: "info@plattenlegerallerart.ch",
+    from_name: "Swiss Platten GmbH",
+    reply_to: "info@plattenlegerallerart.ch",
+    starttls: true,
     active: false
   },
   cookies: {
@@ -98,6 +102,23 @@ export default function AdminDashboard() {
   const [callbacks, setCallbacks] = useState([]);
   const [serviceAreas, setServiceAreas] = useState([]);
   const [serviceAreaSection, setServiceAreaSection] = useState(null);
+  const [teamMembers, setTeamMembers] = useState([]);
+  const [teamMemberForm, setTeamMemberForm] = useState({
+    id: "",
+    name: "",
+    role: "",
+    title: "",
+    bio: "",
+    photo_url: "",
+    email: "",
+    phone: "",
+    social_links: "",
+    is_owner: false,
+    is_active: true,
+    is_featured: false,
+    order: 0
+  });
+  const [editingTeamMember, setEditingTeamMember] = useState(false);
   const [auditLogs, setAuditLogs] = useState([]);
   const [emailLogs, setEmailLogs] = useState([]);
   const [notifications, setNotifications] = useState([]);
@@ -145,10 +166,18 @@ export default function AdminDashboard() {
   // --- BRANDING & SMTP GLOBAL VARIABLES SETTINGS ---
   const [globalSettings, setGlobalSettings] = useState(DEFAULT_GLOBAL_SETTINGS);
   const [logoUploadLoading, setLogoUploadLoading] = useState(false);
+  const [teamPhotoUploadLoading, setTeamPhotoUploadLoading] = useState(false);
 
   // Chat messaging inside quote
   const [quoteMessages, setQuoteMessages] = useState([]);
   const [newChatMessage, setNewChatMessage] = useState("");
+  const quoteMessagesWsRef = useRef(null);
+
+  const buildWebSocketUrl = (path) => {
+    const wsProtocol = BACKEND_URL.startsWith("https") ? "wss" : "ws";
+    const origin = BACKEND_URL.replace(/^https?/, wsProtocol);
+    return `${origin}${path}`;
+  };
 
   // Filters & Searches
   const [statusFilter, setStatusFilter] = useState("all");
@@ -205,18 +234,18 @@ export default function AdminDashboard() {
         setForceReset(false);
       }
     } else {
-      setLoginError(res.error || "Giriş başarısız. Lütfen şifrenizi kontrol edin.");
+      setLoginError(res.error || "Anmeldung fehlgeschlagen. Bitte überprüfen Sie Ihr Passwort.");
     }
   };
 
   const handleForceResetPassword = async (e) => {
     e.preventDefault();
     if (!newPassword || !confirmPassword) {
-      setResetError("Parola alanları boş bırakılamaz.");
+      setResetError("Passwortfelder dürfen nicht leer sein.");
       return;
     }
     if (newPassword !== confirmPassword) {
-      setResetError("Şifreler eşleşmiyor.");
+      setResetError("Passwörter stimmen nicht überein.");
       return;
     }
     try {
@@ -230,7 +259,7 @@ export default function AdminDashboard() {
         checkMe();
       }
     } catch (err) {
-      setResetError(err.response?.data?.detail || "Gözden geçirme hatası.");
+      setResetError(err.response?.data?.detail || "Überprüfungsfehler.");
     }
   };
 
@@ -256,7 +285,7 @@ export default function AdminDashboard() {
         }
       }));
     } catch (err) {
-      alert(err.response?.data?.detail || "Logo yüklenemedi.");
+      alert(err.response?.data?.detail || "Logo konnte nicht hochgeladen werden.");
     } finally {
       setLogoUploadLoading(false);
       event.target.value = "";
@@ -269,7 +298,7 @@ export default function AdminDashboard() {
       const [
         statsRes, quotesRes, contractsRes, slidersRes, 
         reviewsRes, faqsRes, contactsRes, callbacksRes, 
-        notifsRes, pagesRes, logsRes, settingsRes, emailLogsRes, bannersRes, serviceAreasRes, serviceAreaSectionRes
+        notifsRes, pagesRes, logsRes, settingsRes, emailLogsRes, bannersRes, serviceAreasRes, teamRes, serviceAreaSectionRes
       ] = await Promise.all([
         axios.get(`${API}/admin/stats`),
         axios.get(`${API}/admin/quotes`),
@@ -286,6 +315,7 @@ export default function AdminDashboard() {
         axios.get(`${API}/admin/email-logs`),
         axios.get(`${API}/admin/banners`),
         axios.get(`${API}/admin/service-areas`),
+        axios.get(`${API}/admin/team`),
         axios.get(`${API}/admin/homepage-sections/service-areas`)
       ]);
       setStats(statsRes.data);
@@ -302,6 +332,7 @@ export default function AdminDashboard() {
       setEmailLogs(emailLogsRes.data);
       setBanners(bannersRes.data);
       setServiceAreas(serviceAreasRes.data);
+      setTeamMembers(teamRes.data);
       setServiceAreaSection(serviceAreaSectionRes.data);
       if (settingsRes.data && settingsRes.data.general) {
         setGlobalSettings({
@@ -338,15 +369,60 @@ export default function AdminDashboard() {
   };
 
   useEffect(() => {
-    if (selectedQuote) {
-      fetchQuoteMessages(selectedQuote.id);
-      setQuoteItems(selectedQuote.items || []);
-      setDiscountPct(selectedQuote.discount_pct || 0);
-      setMwstActive(selectedQuote.mwst_active !== undefined ? selectedQuote.mwst_active : true);
-      setMwstRate(selectedQuote.mwst_rate || 8.1);
-      setValidityDays(selectedQuote.validity_days || 30);
-      setPaymentTerms(selectedQuote.payment_terms || "30 Tage netto");
+    if (!selectedQuote) {
+      if (quoteMessagesWsRef.current) {
+        quoteMessagesWsRef.current.close();
+        quoteMessagesWsRef.current = null;
+      }
+      return;
     }
+
+    fetchQuoteMessages(selectedQuote.id);
+    setQuoteItems(selectedQuote.items || []);
+    setDiscountPct(selectedQuote.discount_pct || 0);
+    setMwstActive(selectedQuote.mwst_active !== undefined ? selectedQuote.mwst_active : true);
+    setMwstRate(selectedQuote.mwst_rate || 8.1);
+    setValidityDays(selectedQuote.validity_days || 30);
+    setPaymentTerms(selectedQuote.payment_terms || "30 Tage netto");
+
+    if (quoteMessagesWsRef.current) {
+      quoteMessagesWsRef.current.close();
+      quoteMessagesWsRef.current = null;
+    }
+
+    const websocket = new WebSocket(buildWebSocketUrl(`/api/quotes/${selectedQuote.id}/messages/ws`));
+    websocket.onopen = () => {
+      console.info(`Quote messages websocket connected for ${selectedQuote.id}`);
+    };
+    websocket.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data);
+        if (payload?.type === "new_message" && payload?.message) {
+          setQuoteMessages((prev) => {
+            const alreadyExists = prev.some((m) => m.id === payload.message.id);
+            if (alreadyExists) return prev;
+            return [...prev, payload.message];
+          });
+        }
+      } catch (error) {
+        console.error("Invalid websocket payload for quote messages:", error);
+      }
+    };
+    websocket.onclose = () => {
+      console.info(`Quote messages websocket closed for ${selectedQuote.id}`);
+    };
+    websocket.onerror = (event) => {
+      console.error("Quote messages websocket error:", event);
+    };
+
+    quoteMessagesWsRef.current = websocket;
+
+    return () => {
+      if (quoteMessagesWsRef.current) {
+        quoteMessagesWsRef.current.close();
+        quoteMessagesWsRef.current = null;
+      }
+    };
   }, [selectedQuote]);
 
   // --- EXPORTS & REMINDERS CRONS ---
@@ -358,11 +434,11 @@ export default function AdminDashboard() {
     try {
       const res = await axios.post(`${API}/admin/quotes/run-reminders`);
       if (res.data.success) {
-        alert(`${res.data.reminded_count} teklif için hatırlatma çalıştırıldı!`);
+        alert(`${res.data.reminded_count} Erinnerungen ausgeführt!`);
         fetchAllData();
       }
     } catch (e) {
-      alert("Hata oluştu.");
+      alert("Ein Fehler ist aufgetreten.");
     }
   };
 
@@ -407,7 +483,7 @@ export default function AdminDashboard() {
       alert("Kalkulation erfolgreich gespeichert!");
       fetchAllData();
     } catch (e) {
-      alert("Hata oluştu.");
+      alert("Ein Fehler ist aufgetreten.");
     }
   };
 
@@ -535,6 +611,103 @@ export default function AdminDashboard() {
     } finally {
       setBannerUploadLoading(false);
       event.target.value = "";
+    }
+  };
+
+  const handleTeamPhotoUpload = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append("file", file);
+    try {
+      setTeamPhotoUploadLoading(true);
+      const res = await axios.post(`${API}/quotes/upload`, formData, {
+        headers: { "Content-Type": "multipart/form-data" }
+      });
+      setTeamMemberForm((prev) => ({
+        ...prev,
+        photo_url: res.data.url
+      }));
+    } catch (err) {
+      alert(err.response?.data?.detail || "Foto konnte nicht hochgeladen werden.");
+    } finally {
+      setTeamPhotoUploadLoading(false);
+      event.target.value = "";
+    }
+  };
+
+  const handleTeamMemberSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const payload = {
+        name: teamMemberForm.name,
+        role: teamMemberForm.role,
+        title: teamMemberForm.title,
+        bio: teamMemberForm.bio,
+        photo_url: teamMemberForm.photo_url,
+        email: teamMemberForm.email,
+        phone: teamMemberForm.phone,
+        social_links: teamMemberForm.social_links,
+        is_owner: Boolean(teamMemberForm.is_owner),
+        is_active: Boolean(teamMemberForm.is_active),
+        is_featured: Boolean(teamMemberForm.is_featured),
+        order: Number(teamMemberForm.order) || 0
+      };
+
+      if (teamMemberForm.id) {
+        await axios.put(`${API}/admin/team/${teamMemberForm.id}`, payload);
+      } else {
+        await axios.post(`${API}/admin/team`, payload);
+      }
+
+      setEditingTeamMember(false);
+      setTeamMemberForm({
+        id: "",
+        name: "",
+        role: "",
+        title: "",
+        bio: "",
+        photo_url: "",
+        email: "",
+        phone: "",
+        social_links: "",
+        is_owner: false,
+        is_active: true,
+        is_featured: false,
+        order: 0
+      });
+      fetchAllData();
+    } catch (err) {
+      await handleAuthFailure(err, "Fehler beim Speichern des Team-Mitglieds.");
+    }
+  };
+
+  const handleEditTeamMember = (member) => {
+    setTeamMemberForm({
+      id: member.id,
+      name: member.name || "",
+      role: member.role || "",
+      title: member.title || "",
+      bio: member.bio || "",
+      photo_url: member.photo_url || "",
+      email: member.email || "",
+      phone: member.phone || "",
+      social_links: (member.social_links || []).join(", "),
+      is_owner: Boolean(member.is_owner),
+      is_active: member.is_active !== false,
+      is_featured: Boolean(member.is_featured),
+      order: member.order || 0
+    });
+    setEditingTeamMember(true);
+  };
+
+  const handleDeleteTeamMember = async (id) => {
+    if (!window.confirm("Team-Mitglied löschen?")) return;
+    try {
+      await axios.delete(`${API}/admin/team/${id}`);
+      fetchAllData();
+    } catch (err) {
+      await handleAuthFailure(err, "Fehler beim Löschen des Team-Mitglieds.");
     }
   };
 
@@ -691,11 +864,18 @@ export default function AdminDashboard() {
   const handleTestSmtp = async () => {
     setIsTestSmtpLoading(true);
     try {
-      // Simulate connection delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      alert("Verbindung zum SMTP Server erfolgreich hergestellt! Test-E-Mail gesendet.");
+      const payload = {
+        ...globalSettings.smtp,
+        test_recipient: globalSettings.general?.email || "info@plattenlegerallerart.ch"
+      };
+      const res = await axios.post(`${API}/admin/settings/test-smtp`, payload);
+      if (res.data?.success) {
+        alert(`SMTP-Test erfolgreich! ${res.data?.messageId ? `Nachricht-ID: ${res.data.messageId}` : "Test-E-Mail wurde versendet."}`);
+      } else {
+        alert(res.data?.error || "SMTP-Test fehlgeschlagen.");
+      }
     } catch (e) {
-      alert("Verbindung fehlgeschlagen.");
+      alert(e?.response?.data?.error || "Verbindung fehlgeschlagen.");
     } finally {
       setIsTestSmtpLoading(false);
     }
@@ -835,6 +1015,7 @@ export default function AdminDashboard() {
     { id: "sliders", label: "Hero Slider", icon: <Sliders className="w-4 h-4" /> },
     { id: "faqs", label: "FAQs & Reviews", icon: <HelpCircle className="w-4 h-4" /> },
     { id: "serviceareas", label: "Einsatzgebiete", icon: <MapPin className="w-4 h-4" /> },
+    { id: "team", label: "Team", icon: <User className="w-4 h-4" /> },
     { id: "contacts", label: "Nachrichten & Calls", icon: <MessageCircle className="w-4 h-4" /> },
     { id: "banners", label: "Banner Manager", icon: <Palette className="w-4 h-4" /> },
     { id: "settings", label: "System-Einstellungen", icon: <Settings className="w-4 h-4" /> },
@@ -920,7 +1101,7 @@ export default function AdminDashboard() {
             {/* Quick Unread counter */}
             {stats && (stats.totals.new_quotes > 0 || communicationTodoCount > 0) && (
               <span className="bg-red-50 border border-red-200 text-red-600 px-3 py-1 text-[10px] font-bold tracking-widest uppercase rounded-sm">
-                {stats.totals.new_quotes + communicationTodoCount} NEW ACTION REQUIRED
+                {stats.totals.new_quotes + communicationTodoCount} NEUE AKTION ERFORDERLICH
               </span>
             )}
 
@@ -1073,17 +1254,17 @@ export default function AdminDashboard() {
           {/* TAB 2: CONTRACTS */}
           {activeTab === "contracts" && (
             <div className="bg-white border border-slate-200 p-8 rounded shadow-sm space-y-6">
-              <h3 className="text-lg font-black text-slate-900 tracking-tight">Akzeptierte & Imzalanan Sözleşmeler</h3>
+              <h3 className="text-lg font-black text-slate-900 tracking-tight">Akzeptierte & unterschriebene Verträge</h3>
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse text-sm">
                   <thead>
                     <tr className="border-b border-slate-200 text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-50">
-                      <th className="p-4">Sözleşme No (Vertrag)</th>
-                      <th className="p-4">Teklif No (Offerte)</th>
-                      <th className="p-4">Müşteri / Yetkili</th>
-                      <th className="p-4">İmza Tarihi</th>
+                      <th className="p-4">Vertragsnummer</th>
+                      <th className="p-4">Angebotsnummer</th>
+                      <th className="p-4">Kunde / Ansprechpartner</th>
+                      <th className="p-4">Unterschriftsdatum</th>
                       <th className="p-4">Hash</th>
-                      <th className="p-4">IP Adresi</th>
+                      <th className="p-4">IP-Adresse</th>
                       <th className="p-4">Aktion</th>
                     </tr>
                   </thead>
@@ -1120,7 +1301,7 @@ export default function AdminDashboard() {
           {activeTab === "pages" && (
             <div className="bg-white border border-slate-200 p-8 rounded shadow-sm space-y-6">
               <div className="flex justify-between items-center">
-                <h3 className="text-lg font-black text-slate-900 tracking-tight">İçerik Yönetim Sistemi (CMS Pages)</h3>
+                <h3 className="text-lg font-black text-slate-900 tracking-tight">Inhaltsverwaltung (CMS-Seiten)</h3>
                 <button 
                   onClick={() => {
                     setPageForm({
@@ -1142,7 +1323,7 @@ export default function AdminDashboard() {
                 <form onSubmit={handlePageSubmit} className="bg-slate-50 border border-slate-200 p-6 rounded space-y-4 animate-in fade-in">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-1">
-                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Sayfa Başlığı (Titel)</label>
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Seitentitel</label>
                       <input 
                         type="text" value={pageForm.title}
                         onChange={(e) => setPageForm({ ...pageForm, title: e.target.value })}
@@ -1158,7 +1339,7 @@ export default function AdminDashboard() {
                       />
                     </div>
                     <div className="sm:col-span-2 space-y-1">
-                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Sayfa İçeriği (HTML / Rich Text)</label>
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Seiteninhalt (HTML / Rich Text)</label>
                       <textarea 
                         rows={6} value={pageForm.content}
                         onChange={(e) => setPageForm({ ...pageForm, content: e.target.value })}
@@ -1170,7 +1351,7 @@ export default function AdminDashboard() {
                     <div className="sm:col-span-2 border-t pt-4 border-slate-200 mt-2 space-y-4">
                       <h4 className="text-xs font-black uppercase text-[#C5A880] tracking-widest flex items-center space-x-1">
                         <Sparkles className="w-3.5 h-3.5" />
-                        <span>SEO & Meta Tag Yönetimi</span>
+                        <span>SEO- & Meta-Tag-Verwaltung</span>
                       </h4>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-1">
@@ -1426,6 +1607,197 @@ export default function AdminDashboard() {
             </div>
           )}
 
+          {activeTab === "team" && (
+            <div className="bg-white border border-slate-200 p-8 rounded shadow-sm space-y-8">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h3 className="text-lg font-black text-slate-900 tracking-tight">Team verwalten</h3>
+                  <p className="text-xs text-slate-400 font-semibold uppercase mt-1">Verwalten Sie unser Premium-Team, Inhaber und aktive Mitarbeiter.</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setTeamMemberForm({
+                      id: "",
+                      name: "",
+                      role: "",
+                      title: "",
+                      bio: "",
+                      photo_url: "",
+                      email: "",
+                      phone: "",
+                      social_links: "",
+                      is_owner: false,
+                      is_active: true,
+                      is_featured: false,
+                      order: 0
+                    });
+                    setEditingTeamMember(true);
+                  }}
+                  className="bg-slate-900 hover:bg-slate-850 text-white text-xs font-bold uppercase tracking-widest px-4 py-2.5 rounded flex items-center space-x-1.5"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Neues Team-Mitglied</span>
+                </button>
+              </div>
+
+              {editingTeamMember && (
+                <form onSubmit={handleTeamMemberSubmit} className="rounded-2xl border border-slate-200 bg-slate-50 p-6 space-y-6">
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-500 uppercase">Name</label>
+                      <input
+                        type="text"
+                        value={teamMemberForm.name}
+                        onChange={(e) => setTeamMemberForm({ ...teamMemberForm, name: e.target.value })}
+                        className="w-full px-4 py-2 bg-white border rounded text-xs font-bold text-slate-800"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-500 uppercase">Rolle</label>
+                      <input
+                        type="text"
+                        value={teamMemberForm.role}
+                        onChange={(e) => setTeamMemberForm({ ...teamMemberForm, role: e.target.value })}
+                        className="w-full px-4 py-2 bg-white border rounded text-xs font-bold text-slate-800"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-500 uppercase">Titel</label>
+                      <input
+                        type="text"
+                        value={teamMemberForm.title}
+                        onChange={(e) => setTeamMemberForm({ ...teamMemberForm, title: e.target.value })}
+                        className="w-full px-4 py-2 bg-white border rounded text-xs font-bold text-slate-800"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-500 uppercase">Foto URL</label>
+                      <input
+                        type="text"
+                        value={teamMemberForm.photo_url}
+                        onChange={(e) => setTeamMemberForm({ ...teamMemberForm, photo_url: e.target.value })}
+                        className="w-full px-4 py-2 bg-white border rounded text-xs font-bold text-slate-800"
+                      />
+                      <div className="flex items-center gap-3">
+                        <label className="cursor-pointer inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-bold uppercase tracking-[0.18em] text-slate-700 hover:bg-slate-50">
+                          <input
+                            type="file"
+                            accept="image/png,image/jpeg,image/webp"
+                            onChange={handleTeamPhotoUpload}
+                            className="hidden"
+                          />
+                          {teamPhotoUploadLoading ? "Lädt..." : "Foto hochladen"}
+                        </label>
+                        {teamMemberForm.photo_url && (
+                          <a
+                            href={teamMemberForm.photo_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-[10px] font-black uppercase tracking-[0.2em] text-[#C5A880]"
+                          >
+                            Ansicht
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-500 uppercase">E-Mail</label>
+                      <input
+                        type="email"
+                        value={teamMemberForm.email}
+                        onChange={(e) => setTeamMemberForm({ ...teamMemberForm, email: e.target.value })}
+                        className="w-full px-4 py-2 bg-white border rounded text-xs font-bold text-slate-800"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-500 uppercase">Telefon</label>
+                      <input
+                        type="text"
+                        value={teamMemberForm.phone}
+                        onChange={(e) => setTeamMemberForm({ ...teamMemberForm, phone: e.target.value })}
+                        className="w-full px-4 py-2 bg-white border rounded text-xs font-bold text-slate-800"
+                      />
+                    </div>
+                    <div className="space-y-1 md:col-span-2">
+                      <label className="text-xs font-bold text-slate-500 uppercase">Kurzbeschreibung</label>
+                      <textarea
+                        rows={3}
+                        value={teamMemberForm.bio}
+                        onChange={(e) => setTeamMemberForm({ ...teamMemberForm, bio: e.target.value })}
+                        className="w-full px-4 py-2 bg-white border rounded text-xs font-bold text-slate-800"
+                      />
+                    </div>
+                    <div className="space-y-1 md:col-span-2">
+                      <label className="text-xs font-bold text-slate-500 uppercase">Social Links (kommagetrennt)</label>
+                      <input
+                        type="text"
+                        value={teamMemberForm.social_links}
+                        onChange={(e) => setTeamMemberForm({ ...teamMemberForm, social_links: e.target.value })}
+                        className="w-full px-4 py-2 bg-white border rounded text-xs font-bold text-slate-800"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-500 uppercase">Reihenfolge</label>
+                      <input
+                        type="number"
+                        value={teamMemberForm.order}
+                        onChange={(e) => setTeamMemberForm({ ...teamMemberForm, order: Number(e.target.value) })}
+                        className="w-full px-4 py-2 bg-white border rounded text-xs font-bold text-slate-800"
+                      />
+                    </div>
+                    <div className="grid grid-cols-3 gap-3 items-end">
+                      <label className="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" checked={teamMemberForm.is_owner} onChange={(e) => setTeamMemberForm({ ...teamMemberForm, is_owner: e.target.checked })} /> Inhaber</label>
+                      <label className="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" checked={teamMemberForm.is_active} onChange={(e) => setTeamMemberForm({ ...teamMemberForm, is_active: e.target.checked })} /> Aktiv</label>
+                      <label className="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" checked={teamMemberForm.is_featured} onChange={(e) => setTeamMemberForm({ ...teamMemberForm, is_featured: e.target.checked })} /> Featured</label>
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:justify-end sm:items-center pt-3 border-t border-slate-200">
+                    <button type="button" onClick={() => { setEditingTeamMember(false); setTeamMemberForm({ id: "", name: "", role: "", title: "", bio: "", photo_url: "", email: "", phone: "", social_links: "", is_owner: false, is_active: true, is_featured: false, order: 0 }); }} className="px-4 py-2 border rounded text-xs font-bold uppercase">Abbrechen</button>
+                    <button type="submit" className="bg-[#C5A880] text-slate-950 px-5 py-2 text-xs font-bold uppercase rounded hover:bg-[#AF8E5E]">Team-Mitglied speichern</button>
+                  </div>
+                </form>
+              )}
+
+              <div className="grid gap-4">
+                {teamMembers.map((member) => (
+                  <div key={member.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-5 grid gap-4 sm:grid-cols-[auto_1fr] items-center">
+                    <div className="flex items-center gap-4">
+                      {member.photo_url ? (
+                        <img src={member.photo_url} alt={member.name} className="w-20 h-20 rounded-2xl object-cover border border-slate-200" />
+                      ) : (
+                        <div className="w-20 h-20 rounded-2xl bg-slate-900 text-white grid place-items-center text-2xl font-black">{member.name ? member.name[0] : "T"}</div>
+                      )}
+                      <div>
+                        <div className="flex flex-wrap gap-2 items-center mb-2">
+                          <span className="text-sm font-black text-slate-900">{member.name}</span>
+                          {member.is_owner && <span className="text-[10px] uppercase tracking-[0.2em] bg-[#C5A880]/15 text-[#7A5F32] px-2 py-1 rounded-full">Inhaber</span>}
+                          {!member.is_active && <span className="text-[10px] uppercase tracking-[0.2em] bg-slate-100 text-slate-500 px-2 py-1 rounded-full">Inaktiv</span>}
+                        </div>
+                        <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">{member.role || "Teammitglied"}</p>
+                        {member.title && <p className="text-sm text-slate-700 mt-1">{member.title}</p>}
+                      </div>
+                    </div>
+                    <div className="space-y-3 text-sm text-slate-700">
+                      <p>{member.bio || "Keine Beschreibung verfügbar."}</p>
+                      <div className="flex flex-wrap gap-3 text-xs text-slate-500">
+                        {member.email && <span>E-Mail: {member.email}</span>}
+                        {member.phone && <span>Tel: {member.phone}</span>}
+                      </div>
+                      {member.social_links && (
+                        <p className="text-xs text-slate-500">Links: {member.social_links.join ? member.social_links.join(", ") : member.social_links}</p>
+                      )}
+                      <div className="flex flex-wrap gap-2 pt-2">
+                        <button onClick={() => handleEditTeamMember(member)} className="text-xs font-bold uppercase tracking-[0.2em] text-slate-700 border border-slate-200 rounded px-3 py-2 hover:bg-slate-100">Bearbeiten</button>
+                        <button onClick={() => handleDeleteTeamMember(member.id)} className="text-xs font-bold uppercase tracking-[0.2em] text-red-600 border border-red-200 rounded px-3 py-2 hover:bg-red-50">Löschen</button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* TAB 5: FAQS & REVIEWS */}
           {activeTab === "faqs" && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 bg-white border border-slate-200 p-8 rounded shadow-sm">
@@ -1507,7 +1879,7 @@ export default function AdminDashboard() {
           {activeTab === "contacts" && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 bg-white border border-slate-200 p-8 rounded shadow-sm">
               <div className="space-y-6">
-                <h3 className="text-sm font-black uppercase tracking-[0.2em] text-slate-400 pb-2 border-b border-slate-100">Gelen Kontakt Mesajları (Tickets)</h3>
+                <h3 className="text-sm font-black uppercase tracking-[0.2em] text-slate-400 pb-2 border-b border-slate-100">Eingehende Kontaktnachrichten (Tickets)</h3>
                 
                 <div className="space-y-4">
                   {contacts.map(c => (
@@ -1522,7 +1894,7 @@ export default function AdminDashboard() {
                       {/* Nested replies list */}
                       {c.replies && c.replies.length > 0 && (
                         <div className="space-y-2 pt-2 border-t border-slate-100">
-                          <span className="block text-[9px] font-black uppercase text-slate-400">Yazışma Geçmişi</span>
+                          <span className="block text-[9px] font-black uppercase text-slate-400">Nachrichtenverlauf</span>
                           {c.replies.map(rep => (
                             <div key={rep.id} className="bg-slate-100 p-3 rounded text-xs space-y-1">
                               <span className="block font-black text-slate-900">{rep.author} (Mitarbeiter)</span>
@@ -1740,7 +2112,7 @@ export default function AdminDashboard() {
                   <div className="flex flex-wrap items-center gap-3">
                     <label className="inline-flex items-center justify-center px-4 py-2 rounded bg-slate-900 text-white text-[10px] font-black tracking-[0.2em] uppercase cursor-pointer hover:bg-slate-800 transition-colors">
                       <input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleBannerImageUpload} className="hidden" />
-                      {bannerUploadLoading ? "Yükleniyor..." : "Bild hochladen"}
+                      {bannerUploadLoading ? "Wird hochgeladen..." : "Bild hochladen"}
                     </label>
                     <label className="flex items-center gap-2 text-sm text-slate-700 font-semibold">
                       <input
@@ -1783,8 +2155,8 @@ export default function AdminDashboard() {
               <div className="grid grid-cols-1 gap-4">
                 {banners.length === 0 && (
                   <div className="rounded-xl border border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-500 font-semibold">
-                    Henüz banner yok. "Neues Banner" ile ilk bannerınızı ekleyin.
-                  </div>
+                      Noch kein Banner. Fügen Sie mit "Neues Banner" Ihr erstes Banner hinzu.
+                    </div>
                 )}
 
                 {banners.map((banner) => (
@@ -1857,8 +2229,8 @@ export default function AdminDashboard() {
           {activeTab === "settings" && (
             <div className="bg-white border border-slate-200 p-8 rounded shadow-sm space-y-8 animate-in fade-in">
               <div className="border-b pb-4">
-                <h3 className="text-xl font-black text-slate-900 tracking-tight">Merkezi Sistem & SMTP Ayarları</h3>
-                <p className="text-xs text-slate-400 font-semibold uppercase mt-1">İletişim, uid ve e-posta koordinatörlüğü</p>
+                <h3 className="text-xl font-black text-slate-900 tracking-tight">Zentrale System- & SMTP-Einstellungen</h3>
+                  <p className="text-xs text-slate-400 font-semibold uppercase mt-1">Kontakt, UID und E-Mail-Koordination</p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
@@ -1867,7 +2239,7 @@ export default function AdminDashboard() {
                   <h4 className="text-xs font-black uppercase text-slate-500 tracking-widest border-b pb-2">Kurumsal Firma Bilgileri</h4>
                   <div className="space-y-3 font-semibold text-xs uppercase tracking-wider text-slate-400">
                     <div className="space-y-1">
-                      <label>Firma Adı (Slogan)</label>
+                      <label>Firmenname (Slogan)</label>
                       <input 
                         type="text" value={globalSettings.general.company_name}
                         onChange={(e) => setGlobalSettings({
@@ -1889,7 +2261,7 @@ export default function AdminDashboard() {
                       />
                     </div>
                     <div className="space-y-1">
-                      <label>UID / MWST Numarası</label>
+                      <label>UID / MWST-Nummer</label>
                       <input 
                         type="text" value={globalSettings.general.uid}
                         onChange={(e) => setGlobalSettings({
@@ -1904,8 +2276,8 @@ export default function AdminDashboard() {
                   <div className="mt-5 rounded-2xl border border-[#C5A880]/20 bg-white p-4 space-y-4 shadow-sm">
                     <div className="flex items-center justify-between gap-3 flex-wrap">
                       <div>
-                        <h5 className="text-[10px] font-black uppercase tracking-[0.28em] text-slate-500">Logo Yönetimi</h5>
-                        <p className="text-[11px] text-slate-400 font-medium mt-1">Metin logo ya da resimli logo seçin, ikisi de header ve footer’da uygulanır.</p>
+                        <h5 className="text-[10px] font-black uppercase tracking-[0.28em] text-slate-500">Logo-Verwaltung</h5>
+                        <p className="text-[11px] text-slate-400 font-medium mt-1">Wählen Sie Text- oder Bildlogo; beides wird im Header und Footer angewendet.</p>
                       </div>
                       <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 p-1">
                         <button
@@ -1926,14 +2298,14 @@ export default function AdminDashboard() {
                           })}
                           className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em] ${globalSettings.general.logo_mode === "image" ? "bg-slate-900 text-white" : "text-slate-500"}`}
                         >
-                          Resim
+                          Bild
                         </button>
                       </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-1">
-                        <label>Logo Metni</label>
+                        <label>Logo-Text</label>
                         <input
                           type="text"
                           value={globalSettings.general.logo_text}
@@ -1945,7 +2317,7 @@ export default function AdminDashboard() {
                         />
                       </div>
                       <div className="space-y-1">
-                        <label>Logo Alt Metni</label>
+                        <label>Alt-Text des Logos</label>
                         <input
                           type="text"
                           value={globalSettings.general.logo_image_alt}
@@ -1957,7 +2329,7 @@ export default function AdminDashboard() {
                         />
                       </div>
                       <div className="space-y-1 md:col-span-2">
-                        <label>Logo Görsel URL’si</label>
+                        <label>Logo Bild-URL</label>
                         <input
                           type="text"
                           value={globalSettings.general.logo_image_url}
@@ -1974,13 +2346,13 @@ export default function AdminDashboard() {
                     <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
                       <label className="inline-flex items-center justify-center px-4 py-2 rounded bg-slate-900 text-white text-[10px] font-black tracking-[0.2em] uppercase cursor-pointer hover:bg-slate-800 transition-colors">
                         <input type="file" accept="image/png,image/jpeg,image/webp" onChange={handleLogoUpload} className="hidden" />
-                        {logoUploadLoading ? "Yükleniyor..." : "Logo Yükle"}
+                        {logoUploadLoading ? "Wird hochgeladen..." : "Logo hochladen"}
                       </label>
-                      <span className="text-[11px] text-slate-400 font-medium">PNG, JPG veya WEBP yükleyebilirsiniz.</span>
+                      <span className="text-[11px] text-slate-400 font-medium">Sie können PNG, JPG oder WEBP hochladen.</span>
                     </div>
 
                     <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4">
-                      <span className="block text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-3">Önizleme</span>
+                      <span className="block text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-3">Vorschau</span>
                       <div className="inline-flex items-center gap-3 rounded-2xl bg-white px-4 py-3 shadow-sm border border-slate-100">
                         {globalSettings.general.logo_mode === "image" && globalSettings.general.logo_image_url ? (
                           <img
@@ -2010,9 +2382,9 @@ export default function AdminDashboard() {
                         <Sparkles className="h-3.5 w-3.5" />
                         Cookie Architecture
                       </div>
-                      <h4 className="text-2xl font-black tracking-tight sm:text-3xl">Ultra Lüks Cookie Ayarları</h4>
+                      <h4 className="text-2xl font-black tracking-tight sm:text-3xl">Erweiterte Cookie-Einstellungen</h4>
                       <p className="max-w-3xl text-sm leading-relaxed text-slate-300">
-                        Banner metnini, butonları ve kategori tercihlerinin varsayılan durumunu buradan belirleyin. Değişiklikler sistem ayarlarına yazılır ve cookie sayfasında gösterilebilir.
+                        Legen Sie hier Standardtexte für Banner, Schaltflächen und Kategorien fest. Änderungen werden in den Systemeinstellungen gespeichert und auf der Cookie-Seite angezeigt.
                       </p>
                     </div>
                     <div className="grid grid-cols-2 gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-[#E7D6B8] sm:max-w-sm sm:grid-cols-3">
@@ -2026,7 +2398,7 @@ export default function AdminDashboard() {
                     <div className="space-y-4 rounded-[24px] border border-white/10 bg-white/5 p-5 backdrop-blur-sm">
                       <div className="grid gap-4 md:grid-cols-2">
                         <div className="space-y-2 md:col-span-2">
-                          <label className="text-[10px] font-black uppercase tracking-[0.25em] text-[#E7D6B8]">Cookie Banner Başlığı</label>
+                          <label className="text-[10px] font-black uppercase tracking-[0.25em] text-[#E7D6B8]">Cookie-Banner Titel</label>
                           <input
                             type="text"
                             value={globalSettings.cookies.banner_title}
@@ -2038,7 +2410,7 @@ export default function AdminDashboard() {
                           />
                         </div>
                         <div className="space-y-2 md:col-span-2">
-                          <label className="text-[10px] font-black uppercase tracking-[0.25em] text-[#E7D6B8]">Banner Metni</label>
+                          <label className="text-[10px] font-black uppercase tracking-[0.25em] text-[#E7D6B8]">Banner-Text</label>
                           <textarea
                             rows={4}
                             value={globalSettings.cookies.banner_text}
@@ -2050,7 +2422,7 @@ export default function AdminDashboard() {
                           />
                         </div>
                         <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase tracking-[0.25em] text-[#E7D6B8]">Kabul Butonu</label>
+                          <label className="text-[10px] font-black uppercase tracking-[0.25em] text-[#E7D6B8]">Akzeptieren-Button</label>
                           <input
                             type="text"
                             value={globalSettings.cookies.accept_text}
@@ -2062,7 +2434,7 @@ export default function AdminDashboard() {
                           />
                         </div>
                         <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase tracking-[0.25em] text-[#E7D6B8]">Reddet Butonu</label>
+                          <label className="text-[10px] font-black uppercase tracking-[0.25em] text-[#E7D6B8]">Ablehnen-Button</label>
                           <input
                             type="text"
                             value={globalSettings.cookies.reject_text}
@@ -2074,7 +2446,7 @@ export default function AdminDashboard() {
                           />
                         </div>
                         <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase tracking-[0.25em] text-[#E7D6B8]">Ayarlar Butonu</label>
+                          <label className="text-[10px] font-black uppercase tracking-[0.25em] text-[#E7D6B8]">Einstellungen-Button</label>
                           <input
                             type="text"
                             value={globalSettings.cookies.settings_text}
@@ -2086,7 +2458,7 @@ export default function AdminDashboard() {
                           />
                         </div>
                         <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase tracking-[0.25em] text-[#E7D6B8]">Kaydet Butonu</label>
+                          <label className="text-[10px] font-black uppercase tracking-[0.25em] text-[#E7D6B8]">Speichern-Button</label>
                           <input
                             type="text"
                             value={globalSettings.cookies.save_text}
@@ -2117,8 +2489,8 @@ export default function AdminDashboard() {
                           className="mt-1 h-4 w-4 accent-[#C5A880]"
                         />
                         <div>
-                          <p className="text-sm font-black">Cookie Modülü Aktif</p>
-                          <p className="mt-1 text-xs text-slate-500">Bu ayar kapatılırsa banner ve preferences akışı devre dışı kalır.</p>
+                          <p className="text-sm font-black">Cookie-Modul aktiv</p>
+                          <p className="mt-1 text-xs text-slate-500">Wenn diese Einstellung deaktiviert ist, sind Banner und Präferenzen deaktiviert.</p>
                         </div>
                       </label>
 
@@ -2133,15 +2505,15 @@ export default function AdminDashboard() {
                           className="mt-1 h-4 w-4 accent-[#C5A880]"
                         />
                         <div>
-                          <p className="text-sm font-black">Banner Açılışta Görünsün</p>
-                          <p className="mt-1 text-xs text-slate-500">Ziyaretçi sayfayı ilk açtığında cookie katmanı otomatik gösterilir.</p>
+                          <p className="text-sm font-black">Banner beim ersten Besuch anzeigen</p>
+                          <p className="mt-1 text-xs text-slate-500">Der Cookie-Banner wird automatisch beim ersten Besuch der Seite angezeigt.</p>
                         </div>
                       </label>
 
                       <div className="grid gap-3 md:grid-cols-3">
                         <label className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                           <div className="flex items-center justify-between gap-3">
-                            <span className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">Gerekli</span>
+                            <span className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">Erforderlich</span>
                             <input
                               type="checkbox"
                               checked={Boolean(globalSettings.cookies.default_necessary)}
@@ -2156,7 +2528,7 @@ export default function AdminDashboard() {
                         </label>
                         <label className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                           <div className="flex items-center justify-between gap-3">
-                            <span className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">Analiz</span>
+                            <span className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">Analyse</span>
                             <input
                               type="checkbox"
                               checked={Boolean(globalSettings.cookies.default_analytics)}
@@ -2219,12 +2591,12 @@ export default function AdminDashboard() {
                 {/* SMTP configuration */}
                 <div className="space-y-4 bg-slate-50 p-6 rounded border border-slate-150">
                   <div className="flex justify-between items-center border-b pb-2 border-slate-200">
-                    <h4 className="text-xs font-black uppercase text-slate-500 tracking-widest">SMTP E-Posta Yapılandırması</h4>
+                        <h4 className="text-xs font-black uppercase text-slate-500 tracking-widest">SMTP E-Mail-Konfiguration</h4>
                     <button 
                       type="button" onClick={handleTestSmtp} disabled={isTestSmtpLoading}
                       className="text-[9px] font-black uppercase text-[#C5A880] hover:text-[#9B8265] tracking-widest"
                     >
-                      {isTestSmtpLoading ? "Verbinden..." : "Bağlantıyı Test Et"}
+                      {isTestSmtpLoading ? "Verbinden..." : "Verbindung testen"}
                     </button>
                   </div>
                   <div className="space-y-3 font-semibold text-xs uppercase tracking-wider text-slate-400">
@@ -2252,7 +2624,7 @@ export default function AdminDashboard() {
                         />
                       </div>
                       <div className="space-y-1">
-                        <label>SMTP Kullanıcı Adı</label>
+                        <label>SMTP-Benutzername</label>
                         <input 
                           type="text" value={globalSettings.smtp.username}
                           onChange={(e) => setGlobalSettings({
@@ -2263,6 +2635,87 @@ export default function AdminDashboard() {
                         />
                       </div>
                     </div>
+                    <div className="space-y-1">
+                      <label>SMTP-Passwort</label>
+                      <input 
+                        type="password" value={globalSettings.smtp.password}
+                        onChange={(e) => setGlobalSettings({
+                          ...globalSettings,
+                          smtp: { ...globalSettings.smtp, password: e.target.value }
+                        })}
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-xs font-bold text-slate-800"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label>Sender E-Mail</label>
+                        <input 
+                          type="email" value={globalSettings.smtp.from_email}
+                          onChange={(e) => setGlobalSettings({
+                            ...globalSettings,
+                            smtp: { ...globalSettings.smtp, from_email: e.target.value }
+                          })}
+                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-xs font-bold text-slate-800"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label>Absendername</label>
+                        <input 
+                          type="text" value={globalSettings.smtp.from_name}
+                          onChange={(e) => setGlobalSettings({
+                            ...globalSettings,
+                            smtp: { ...globalSettings.smtp, from_name: e.target.value }
+                          })}
+                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-xs font-bold text-slate-800"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label>Reply-To</label>
+                        <input 
+                          type="email" value={globalSettings.smtp.reply_to}
+                          onChange={(e) => setGlobalSettings({
+                            ...globalSettings,
+                            smtp: { ...globalSettings.smtp, reply_to: e.target.value }
+                          })}
+                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-xs font-bold text-slate-800"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label>Testempfänger</label>
+                        <input 
+                          type="email" value={globalSettings.general?.email || ""}
+                          onChange={(e) => setGlobalSettings({
+                            ...globalSettings,
+                            general: { ...globalSettings.general, email: e.target.value }
+                          })}
+                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-xs font-bold text-slate-800"
+                        />
+                      </div>
+                    </div>
+                    <label className="flex items-center gap-2 text-slate-600">
+                      <input 
+                        type="checkbox" checked={globalSettings.smtp.starttls}
+                        onChange={(e) => setGlobalSettings({
+                          ...globalSettings,
+                          smtp: { ...globalSettings.smtp, starttls: e.target.checked }
+                        })}
+                        className="h-4 w-4 accent-[#C5A880]"
+                      />
+                      STARTTLS aktivieren
+                    </label>
+                    <label className="flex items-center gap-2 text-slate-600">
+                      <input 
+                        type="checkbox" checked={globalSettings.smtp.active}
+                        onChange={(e) => setGlobalSettings({
+                          ...globalSettings,
+                          smtp: { ...globalSettings.smtp, active: e.target.checked }
+                        })}
+                        className="h-4 w-4 accent-[#C5A880]"
+                      />
+                      SMTP aktiv
+                    </label>
                   </div>
                 </div>
               </div>
@@ -2271,12 +2724,12 @@ export default function AdminDashboard() {
                 <button 
                   onClick={async () => {
                     await axios.put(`${API}/admin/settings`, globalSettings);
-                    alert("Ayarlar başarıyla veritabanına kaydedildi ve güncellendi!");
+                    alert("Einstellungen erfolgreich in der Datenbank gespeichert und aktualisiert!");
                   }}
                   className="bg-slate-900 hover:bg-slate-850 text-white font-extrabold text-[10px] tracking-widest uppercase px-6 py-4 rounded-sm flex items-center space-x-2"
                 >
                   <Save className="w-4 h-4 text-[#C5A880]" />
-                  <span>Sistem Ayarlarını Kaydet</span>
+                  <span>Systemeinstellungen speichern</span>
                 </button>
               </div>
             </div>
@@ -2286,19 +2739,19 @@ export default function AdminDashboard() {
           {activeTab === "audit" && (
             <div className="bg-white border border-slate-200 p-8 rounded shadow-sm space-y-6">
               <div className="border-b pb-4">
-                <h3 className="text-xl font-black text-slate-900 tracking-tight">Audit Protokolle (İşlem Logları)</h3>
-                <p className="text-xs text-slate-400 font-semibold uppercase mt-1">Sistem üzerindeki tüm idari ve kritik etkinliklerin dökümü</p>
+                <h3 className="text-xl font-black text-slate-900 tracking-tight">Audit-Protokolle (Aktivitätsprotokolle)</h3>
+                <p className="text-xs text-slate-400 font-semibold uppercase mt-1">Auflistung aller administrativen und kritischen Aktivitäten im System</p>
               </div>
 
               <div className="overflow-x-auto max-h-[500px]">
                 <table className="w-full text-left border-collapse text-xs">
                   <thead>
                     <tr className="border-b border-slate-200 text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-50">
-                      <th className="p-3">Zaman</th>
-                      <th className="p-3">Kullanıcı (E-Mail)</th>
-                      <th className="p-3">Rol</th>
-                      <th className="p-3">İşlem Detayı</th>
-                      <th className="p-3">IP Adresi</th>
+                      <th className="p-3">Zeit</th>
+                      <th className="p-3">Benutzer (E-Mail)</th>
+                      <th className="p-3">Rolle</th>
+                      <th className="p-3">Vorgangsdetails</th>
+                      <th className="p-3">IP-Adresse</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
@@ -2497,6 +2950,42 @@ export default function AdminDashboard() {
                   </div>
                 </div>
               </div>
+            </div>
+
+            <div className="bg-white border border-slate-200 rounded p-6 space-y-4 mt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-widest text-slate-500">Live Angebots-Nachrichten</p>
+                  <h3 className="text-lg font-black text-slate-900">Chatverlauf für Offerte {selectedQuote.reference_number}</h3>
+                </div>
+              </div>
+
+              <div className="space-y-3 max-h-[28rem] overflow-y-auto border border-slate-100 rounded p-3 bg-slate-50">
+                {quoteMessages.length === 0 ? (
+                  <p className="text-xs text-slate-500 italic">Noch keine Nachrichten vorhanden.</p>
+                ) : (
+                  quoteMessages.map((message) => (
+                    <div key={message.id} className="rounded border border-slate-200 bg-white p-3 shadow-sm">
+                      <div className="flex items-center justify-between text-[11px] uppercase tracking-[0.18em] text-slate-500 font-black">
+                        <span>{message.sender || "Kunde"}</span>
+                        <span>{new Date(message.created_at).toLocaleString()}</span>
+                      </div>
+                      <p className="mt-2 text-sm text-slate-700 whitespace-pre-line">{message.message}</p>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <form onSubmit={handleSendChatMessage} className="space-y-3">
+                <textarea
+                  rows={4}
+                  value={newChatMessage}
+                  onChange={(e) => setNewChatMessage(e.target.value)}
+                  className="w-full rounded border border-slate-200 p-3 text-sm bg-white text-slate-900"
+                  placeholder="Neue Nachricht an den Kunden eingeben..."
+                />
+                <button type="submit" className="w-full bg-[#C5A880] text-slate-950 font-black py-3 text-xs uppercase tracking-widest rounded-sm">Nachricht senden</button>
+              </form>
             </div>
           </div>
         </div>

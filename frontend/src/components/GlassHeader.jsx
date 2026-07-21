@@ -83,6 +83,7 @@ export default function GlassHeader() {
     { name: t("nav.home"), path: "/" },
     { name: t("nav.services"), path: "/services" },
     { name: t("nav.portfolio"), path: "/portfolio" },
+    { name: t("nav.team"), path: "/team" },
     { name: t("nav.areas"), path: "/areas" },
     { name: t("nav.faq"), path: "/faq" },
     { name: t("nav.contact"), path: "/contact" },

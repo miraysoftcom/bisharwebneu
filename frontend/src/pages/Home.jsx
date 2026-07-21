@@ -6,8 +6,7 @@ import { Star, Shield, Award, ClipboardCheck, ArrowRight, CheckCircle2, ChevronR
 import { PORTFOLIO } from "@/constants/testIds";
 import ServiceAreasSection from "@/components/ServiceAreasSection";
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
-const API = `${BACKEND_URL}/api`;
+const API = `${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000"}/api`;
 
 export default function Home() {
   const { t, lang } = useLanguage();
@@ -54,6 +53,7 @@ export default function Home() {
     axios.get(`${API}/banners`)
       .then((res) => setBanners(res.data))
       .catch((err) => console.error("Error loading banners:", err));
+
   }, []);
 
   // Automatic slide rotation (every 5 seconds)
@@ -71,6 +71,14 @@ export default function Home() {
     { key: "spezialabdichtungen", bg: "bg-white text-slate-900 border border-[#C5A880]/10" },
     { key: "bodenschleifen", bg: "bg-[#1A1F24] text-white border border-[#C5A880]/15" }
   ];
+
+  const resolveAssetUrl = (url) => {
+    if (!url) return url;
+    if (url.startsWith("http://") || url.startsWith("https://")) {
+      return url;
+    }
+    return `${BACKEND_URL}${url}`;
+  };
 
   const handleMove = (clientX) => {
     const container = document.getElementById("slider-container");
@@ -168,13 +176,13 @@ export default function Home() {
             return (
               <div 
                 key={slide.id || idx}
-                className={`absolute inset-0 transition-opacity duration-[1000ms] ease-in-out ${
+                className={`absolute inset-0 transition-opacity duration-&lsqb;1000ms&rsqb; ease-in-out ${
                   active ? "opacity-100 z-10" : "opacity-0 z-0 pointer-events-none"
                 }`}
               >
                 {/* Parallax zooming background image */}
                 <div 
-                  className={`absolute inset-0 bg-cover bg-center bg-no-repeat transition-transform duration-[15000ms] ${
+                  className={`absolute inset-0 bg-cover bg-center bg-no-repeat transition-transform duration-&lsqb;15000ms&rsqb; ${
                     active ? "scale-105" : "scale-100"
                   }`}
                   style={{ 
@@ -517,7 +525,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 5. Testimonials */}
       {reviews.length > 0 && (
         <section className="py-28 bg-white border-t border-[#C5A880]/10">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

@@ -5,7 +5,7 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, UploadFile, File, Form, status
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, UploadFile, File, Form, status, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -20,6 +20,7 @@ import hashlib
 import csv
 import io
 import re
+import json
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional
 from pydantic import BaseModel, Field, ConfigDict, EmailStr
@@ -102,6 +103,20 @@ def serialize_doc(doc):
             doc[k] = [serialize_doc(x) if isinstance(x, dict) else x for x in v]
     return doc
 
+
+# WebSocket manager for live quote message updates
+quote_message_connections = {}
+
+async def broadcast_quote_message(quote_id: str, message: dict):
+    connections = quote_message_connections.get(quote_id, [])
+    if not connections:
+        return
+    payload = json.dumps({"type": "new_message", "message": serialize_doc(message)})
+    for ws in connections.copy():
+        try:
+            await ws.send_text(payload)
+        except Exception:
+            connections.remove(ws)
 
 REVIEW_MIN_SUBMIT_SECONDS = 3
 REVIEW_MIN_GAP_PER_IP_SECONDS = 45
@@ -589,6 +604,68 @@ async def update_banner(id: str, req: dict, current_user: dict = Depends(get_cur
 async def delete_banner(id: str, current_user: dict = Depends(get_current_user)):
     await db.banners.delete_one({"_id": ObjectId(id)})
     await log_activity(current_user["email"], current_user["role"], f"Deleted banner {id}")
+    return {"success": True}
+
+# --- TEAM MANAGEMENT ---
+
+@api_router.get("/team")
+async def get_public_team():
+    team = await db.team.find({"is_active": True}).sort([("order", 1), ("is_owner", -1), ("name", 1)]).to_list(100)
+    return [serialize_doc(member) for member in team]
+
+@api_router.get("/admin/team", dependencies=[Depends(require_admin)])
+async def get_admin_team():
+    members = await db.team.find({}).sort([("order", 1), ("is_owner", -1), ("name", 1)]).to_list(200)
+    return [serialize_doc(member) for member in members]
+
+@api_router.post("/admin/team", dependencies=[Depends(require_admin)])
+async def create_team_member(req: dict, current_user: dict = Depends(get_current_user)):
+    member_doc = {
+        "name": req.get("name", ""),
+        "role": req.get("role", ""),
+        "title": req.get("title", ""),
+        "bio": req.get("bio", ""),
+        "photo_url": req.get("photo_url", ""),
+        "email": req.get("email", ""),
+        "phone": req.get("phone", ""),
+        "social_links": [link.strip() for link in str(req.get("social_links", "")).split(",") if link.strip()],
+        "is_owner": bool(req.get("is_owner", False)),
+        "is_active": bool(req.get("is_active", True)),
+        "is_featured": bool(req.get("is_featured", False)),
+        "order": int(req.get("order", 0)),
+        "created_at": datetime.now(timezone.utc),
+        "updated_at": datetime.now(timezone.utc)
+    }
+    res = await db.team.insert_one(member_doc)
+    member_doc["_id"] = res.inserted_id
+    await log_activity(current_user["email"], current_user["role"], f"Created team member {member_doc['name']}")
+    return serialize_doc(member_doc)
+
+@api_router.put("/admin/team/{id}", dependencies=[Depends(require_admin)])
+async def update_team_member(id: str, req: dict, current_user: dict = Depends(get_current_user)):
+    member_doc = {
+        "name": req.get("name"),
+        "role": req.get("role"),
+        "title": req.get("title"),
+        "bio": req.get("bio"),
+        "photo_url": req.get("photo_url"),
+        "email": req.get("email"),
+        "phone": req.get("phone"),
+        "social_links": [link.strip() for link in str(req.get("social_links", "")).split(",") if link.strip()],
+        "is_owner": bool(req.get("is_owner", False)),
+        "is_active": bool(req.get("is_active", True)),
+        "is_featured": bool(req.get("is_featured", False)),
+        "order": int(req.get("order", 0)),
+        "updated_at": datetime.now(timezone.utc)
+    }
+    await db.team.update_one({"_id": ObjectId(id)}, {"$set": member_doc})
+    await log_activity(current_user["email"], current_user["role"], f"Updated team member {id}")
+    return {"success": True}
+
+@api_router.delete("/admin/team/{id}", dependencies=[Depends(require_admin)])
+async def delete_team_member(id: str, current_user: dict = Depends(get_current_user)):
+    await db.team.delete_one({"_id": ObjectId(id)})
+    await log_activity(current_user["email"], current_user["role"], f"Deleted team member {id}")
     return {"success": True}
 
 # --- SERVICE AREAS (EINSATZGEBIETE) ---
@@ -1256,24 +1333,17 @@ async def submit_quote(req: dict):
     
     # Dynamically generate ReportLab A4 PDF and attach to confirmation email
     try:
-        from pdf_service import build_swiss_pdf
-        from email_service import send_email_async
-        pdf_filename = f"Offerte_{ref_num}_{quote_doc['last_name']}.pdf"
-        target_path = UPLOAD_DIR / pdf_filename
-        
-        build_swiss_pdf(quote_doc, str(target_path), is_contract=False)
-        attachments = [{"path": str(target_path), "filename": pdf_filename}]
-        
+        from email_service import build_and_send_quote_email
         subject = f"Bestätigung Ihrer Offertenanfrage - {ref_num}"
         html_body = f"""
         <h2>Sehr geehrte/r {quote_doc['first_name']} {quote_doc['last_name']},</h2>
-        <p>vielen Dank für Ihre Offertenanfrage bei <b>Swiss Platten GmbH</b>.</p>
+        <p>vielen Dank für Ihre Offertenanfrage bei <b>Plattenleger Aller Art</b>.</p>
         <p>Wir haben Ihre Anfrage erhalten und prüfen diese umgehend. Ihre Referenznummer lautet: <b>{ref_num}</b>.</p>
         <p>Im Anhang finden Sie die Zusammenfassung Ihrer Anfrage als professionelles, rechtssicheres PDF-Dokument.</p>
         <br/>
-        <p>Mit freundlichen Grüssen,<br/><b>Swiss Platten GmbH Team</b></p>
+        <p>Mit freundlichen Grüssen,<br/><b>Plattenleger Aller Art Team</b></p>
         """
-        await send_email_async(db, quote_doc["email"], subject, html_body, attachments=attachments, quote_num=ref_num)
+        await build_and_send_quote_email(db, quote_doc, html_body, subject, quote_num=ref_num)
     except Exception as pdf_err:
         logger.error(f"Confirmation email/PDF dispatch failed on submit: {pdf_err}")
     
@@ -1313,22 +1383,29 @@ async def accept_and_sign_quote(token: str, req: dict):
     quote = await db.quotes.find_one({"secure_token": token})
     if not quote:
         raise HTTPException(status_code=404, detail="Offerte nicht gefunden.")
+
+    signer_name = str(req.get("signer_name", "")).strip()
+    signature_svg = str(req.get("signature_svg", "")).strip()
+    if not signer_name:
+        raise HTTPException(status_code=400, detail="Der Name des Unterzeichners ist erforderlich.")
+    if not signature_svg or signature_svg == "[DIGITAL_SIGNATURE_PLACEHOLDER]":
+        raise HTTPException(status_code=400, detail="Die digitale Unterschrift muss ausgefüllt sein.")
     
     contracts_count = await db.contracts.count_documents({})
     vtr_num = f"VTR-2026-{str(contracts_count + 1).zfill(6)}"
     
-    raw_hash_data = f"{quote['reference_number']}-{vtr_num}-{req.get('signer_name')}-{datetime.now(timezone.utc)}"
+    raw_hash_data = f"{quote['reference_number']}-{vtr_num}-{signer_name}-{datetime.now(timezone.utc)}"
     verification_hash = hashlib.sha256(raw_hash_data.encode()).hexdigest()[:16].upper()
     
     contract_doc = {
         "contract_number": vtr_num,
         "quote_number": quote["reference_number"],
         "quote_id": str(quote["_id"]),
-        "signer_name": req.get("signer_name", ""),
+        "signer_name": signer_name,
         "signer_company": req.get("signer_company", ""),
         "ip_address": req.get("ip_address", "127.0.0.1"),
         "user_agent": req.get("user_agent", "Browser"),
-        "signature_svg": req.get("signature_svg", ""),
+        "signature_svg": signature_svg,
         "verification_hash": verification_hash,
         "status": "Unterschrieben",
         "created_at": datetime.now(timezone.utc)
@@ -1339,11 +1416,36 @@ async def accept_and_sign_quote(token: str, req: dict):
     # Update Quote Status
     await db.quotes.update_one(
         {"_id": quote["_id"]},
-        {"$set": {"status": "Akzeptiert", "contract_number": vtr_num, "accepted_at": datetime.now(timezone.utc)}}
+        {"$set": {"status": "Akzeptiert", "contract_number": vtr_num, "accepted_at": datetime.now(timezone.utc), "signature_svg": signature_svg}}
     )
-    
+
+    updated_quote = quote.copy()
+    updated_quote["status"] = "Akzeptiert"
+    updated_quote["contract_number"] = vtr_num
+    updated_quote["accepted_at"] = datetime.now(timezone.utc)
+    updated_quote["signature_svg"] = signature_svg
+
+    from email_service import build_and_send_quote_email, email_delivery_ok
+    subject = f"Ihre unterschriebene Offerte {quote.get('reference_number')}"
+    html_body = f"""
+        <h2>Sehr geehrte/r {quote.get('first_name', '')} {quote.get('last_name', '')},</h2>
+        <p>Ihre Offerte wurde erfolgreich akzeptiert und digital unterschrieben.</p>
+        <p>Im Anhang finden Sie den unterschriebenen Vertrag als PDF-Dokument.</p>
+        <p>Vielen Dank für Ihr Vertrauen in Swiss Platten GmbH.</p>
+    """
+    email_result = await build_and_send_quote_email(
+        db,
+        updated_quote,
+        html_body,
+        subject,
+        quote_num=vtr_num,
+        is_contract=True
+    )
+    if not email_delivery_ok(email_result):
+        raise HTTPException(status_code=500, detail=email_result.get("message", "Unterschriebener Vertrag konnte nicht gesendet werden."))
+
     await db.notifications.insert_one({
-        "message": f"Vertrag {vtr_num} für Offerte {quote['reference_number']} wurde unterschrieben!",
+        "message": f"Vertrag {vtr_num} für Offerte {quote['reference_number']} wurde unterschrieben und per E-Mail versendet!",
         "read": False,
         "priority": "Dringend",
         "created_at": datetime.now(timezone.utc)
@@ -1353,7 +1455,8 @@ async def accept_and_sign_quote(token: str, req: dict):
         "success": True,
         "contract_number": vtr_num,
         "verification_hash": verification_hash,
-        "contract": serialize_doc(contract_doc)
+        "contract": serialize_doc(contract_doc),
+        "email_status": email_result
     }
 
 # --- MESSAGING CHAT SYSTEMS ---
@@ -1362,6 +1465,18 @@ async def accept_and_sign_quote(token: str, req: dict):
 async def get_quote_messages(quote_id: str):
     messages = await db.offerte_messages.find({"quote_id": quote_id}).sort("created_at", 1).to_list(100)
     return [serialize_doc(m) for m in messages]
+
+@api_router.websocket("/quotes/{quote_id}/messages/ws")
+async def quote_messages_ws(websocket: WebSocket, quote_id: str):
+    await websocket.accept()
+    quote_message_connections.setdefault(quote_id, []).append(websocket)
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        quote_message_connections.get(quote_id, []).remove(websocket)
+    except Exception:
+        quote_message_connections.get(quote_id, []).remove(websocket)
 
 @api_router.post("/quotes/{quote_id}/messages")
 async def send_quote_message(quote_id: str, req: dict):
@@ -1372,7 +1487,10 @@ async def send_quote_message(quote_id: str, req: dict):
         "files": req.get("files", []),
         "created_at": datetime.now(timezone.utc)
     }
-    await db.offerte_messages.insert_one(msg_doc)
+    result = await db.offerte_messages.insert_one(msg_doc)
+    msg_doc["_id"] = result.inserted_id
+    sent_message = serialize_doc(msg_doc)
+    await broadcast_quote_message(quote_id, sent_message)
     
     if req.get("sender") == "Client":
         await db.notifications.insert_one({
@@ -1382,7 +1500,7 @@ async def send_quote_message(quote_id: str, req: dict):
             "created_at": datetime.now(timezone.utc)
         })
         
-    return serialize_doc(msg_doc)
+    return sent_message
 
 # --- PDF GENERATION & STREAMING ---
 
@@ -1619,10 +1737,49 @@ async def update_quote_full(quote_id: str, req: dict, current_user: dict = Depen
             update_data[field] = req[field]
             
     update_data["updated_at"] = datetime.now(timezone.utc)
-    
+
+    if update_data.get("status") == "An Kunden gesendet":
+        quote = await db.quotes.find_one({"_id": ObjectId(quote_id)})
+        if not quote:
+            raise HTTPException(status_code=404, detail="Anfrage nicht gefunden.")
+        if not quote.get("email"):
+            raise HTTPException(status_code=400, detail="Kunde hat keine E-Mail-Adresse.")
+
+        from email_service import build_and_send_quote_email, email_delivery_ok
+        frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000").rstrip("/")
+        accept_link = f"{frontend_url}/quotes/token/{quote.get('secure_token')}"
+        subject = f"Ihre Offerte - {quote.get('reference_number', 'OFF')}"
+        html_body = f"""
+        <h2>Sehr geehrte/r {quote.get('first_name', '')} {quote.get('last_name', '')},</h2>
+        <p>anbei erhalten Sie Ihre Offerte von <b>Plattenleger Aller Art</b>.</p>
+        <p>Bitte prüfen Sie die Offerte und akzeptieren Sie diese online über den folgenden Button:</p>
+        <p style=\"margin:24px 0;\"><a href=\"{accept_link}\" style=\"display:inline-block;padding:14px 24px;background-color:#1d4ed8;color:#ffffff;text-decoration:none;font-weight:bold;border-radius:8px;\">Offerte akzeptieren &amp; signieren</a></p>
+        <p>Alternativ können Sie diesen direkten Link verwenden:</p>
+        <p><a href=\"{accept_link}\" style=\"color:#1d4ed8;text-decoration:underline;\">{accept_link}</a></p>
+        <p>Auf der Seite können Sie die Offerte einsehen, digital unterschreiben und direkt absenden.</p>
+        <p>Mit freundlichen Grüssen,<br/><b>Plattenleger Aller Art Team</b></p>
+        """
+        email_result = await build_and_send_quote_email(
+            db,
+            quote,
+            html_body,
+            subject,
+            quote_num=quote.get("reference_number"),
+        )
+        if not email_delivery_ok(email_result):
+            raise HTTPException(status_code=500, detail=email_result.get("message", "E-Mail konnte nicht versendet werden."))
+
+        update_data["sent_at"] = datetime.now(timezone.utc)
+        await db.notifications.insert_one({
+            "message": f"Offerte {quote.get('reference_number')} an {quote.get('email')} gesendet",
+            "read": False,
+            "priority": "Information",
+            "created_at": datetime.now(timezone.utc)
+        })
+
     await db.quotes.update_one({"_id": ObjectId(quote_id)}, {"$set": update_data})
     await log_activity(current_user["email"], current_user["role"], f"Updated quote data for {quote_id}")
-    return {"success": True}
+    return {"success": True, "message": "Offerte erfolgreich an den Kunden versendet."}
 
 @api_router.get("/admin/quotes/{quote_id}", dependencies=[Depends(require_admin)])
 async def get_admin_quote_detail(quote_id: str):
@@ -1852,9 +2009,10 @@ async def test_smtp_connection_endpoint(req: dict):
     user = req.get("username", "")
     password = req.get("password", "")
     test_recipient = req.get("test_recipient", "info@plattenlegerallerart.ch")
+    starttls = req.get("starttls", True)
     
     from email_service import run_smtp_diagnostics
-    res = await run_smtp_diagnostics(host, port, user, password, test_recipient)
+    res = await run_smtp_diagnostics(host, port, user, password, test_recipient, starttls=starttls)
     return res
 
 @api_router.get("/admin/email-logs", dependencies=[Depends(require_admin)])
@@ -1953,7 +2111,10 @@ async def startup_db_seeding():
         logger.info("Seed: Populated default hero sliders")
 
     # 3. Seed Default 100 Swiss FAQs
-    from seed_faqs import seed_100_faqs
+    try:
+        from backend.seed_faqs import seed_100_faqs
+    except ImportError:
+        from seed_faqs import seed_100_faqs
     await seed_100_faqs(db)
 
     # 4. Seed Default Reviews
