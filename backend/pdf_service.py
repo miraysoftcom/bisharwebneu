@@ -168,7 +168,8 @@ def build_swiss_pdf(quote: dict, output_path: str, is_contract: bool = False):
     # 1. Company Coordinates / Logo Area with Dynamic Verification QR-Code
     from reportlab.graphics.barcode import qr
     token = quote.get("secure_token", "default")
-    verify_url = f"https://fassadenmeister-dev.preview.emergentagent.com/quotes/token/{token}"
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000").rstrip("/")
+    verify_url = f"{frontend_url}/quotes/token/{token}"
     
     qr_widget = qr.QrCodeWidget(verify_url)
     qr_widget.barWidth = 45

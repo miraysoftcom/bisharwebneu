@@ -41,20 +41,25 @@ export default function GlassHeader() {
     const logoSrc = logoUrl?.startsWith("http") ? logoUrl : logoUrl ? `${BACKEND_URL}${logoUrl}` : "";
     const logoText = siteSettings?.logo_text || siteSettings?.site_name || siteSettings?.company_name || "SWISS PLATTEN";
     const subtitle = siteSettings?.logo_subtitle || "Atelier d'Architecture";
+    const logoInitials = siteSettings?.logo_initials || logoText.slice(0, 2).toUpperCase();
+    const logoHeight = siteSettings?.logo_image_height || (compact ? "10" : "11");
+    const logoWidth = siteSettings?.logo_image_width || (compact ? "10" : "11");
+    const logoMaxWidth = compact ? "max-w-[16rem]" : "max-w-[20rem]";
 
     if (logoMode === "image" && logoSrc) {
       return (
-        <div className={`flex items-center gap-3 ${compact ? "max-w-[12rem]" : "max-w-[16rem]"}`}>
+        <div className={`flex items-center gap-3 flex-shrink-0 ${logoMaxWidth}`}>
           <img
             src={logoSrc}
             alt={siteSettings?.logo_image_alt || logoText}
-            className={`${compact ? "h-10 w-10" : "h-11 w-11"} rounded-lg object-cover border border-[#C5A880]/25 bg-white shadow-sm shrink-0`}
+            style={{ height: `${logoHeight}px`, width: `${logoWidth}px` }}
+            className="rounded-lg object-cover border border-[#C5A880]/25 bg-white shadow-sm shrink-0"
           />
           <div className="flex min-w-0 flex-col">
-            <span className={`truncate font-black tracking-widest text-[#111418] leading-none ${compact ? "text-sm" : "text-base"}`}>
+            <span className={`truncate whitespace-nowrap font-black tracking-widest text-[#111418] leading-none ${compact ? "text-sm" : "text-base"}`}>
               {logoText}
             </span>
-            <span className="truncate text-[9px] font-extrabold tracking-[0.25em] text-[#C5A880] uppercase mt-0.5">
+            <span className="truncate whitespace-nowrap text-[9px] font-extrabold tracking-[0.25em] text-[#C5A880] uppercase mt-0.5">
               {subtitle}
             </span>
           </div>
@@ -63,15 +68,20 @@ export default function GlassHeader() {
     }
 
     return (
-      <div className={`flex items-center gap-3 ${compact ? "max-w-[12rem]" : "max-w-[16rem]"}`}>
-        <div className={`${compact ? "w-10 h-10" : "w-11 h-11"} bg-gradient-to-br from-[#1E2328] to-[#111418] border border-[#C5A880]/30 flex items-center justify-center font-black text-[#C5A880] ${compact ? "text-base" : "text-xl"} tracking-tighter shadow-xl rounded-sm shrink-0`}>
-          {String(logoText).slice(0, 2).toUpperCase() || "CH"}
+      <div className={`flex items-center gap-3 flex-shrink-0 ${logoMaxWidth}`}>
+        <div 
+          style={{ height: `${logoHeight}px`, width: `${logoWidth}px` }}
+          className="bg-gradient-to-br from-[#1E2328] to-[#111418] border border-[#C5A880]/30 flex items-center justify-center font-black text-[#C5A880] tracking-tighter shadow-xl rounded-sm shrink-0"
+        >
+          <span style={{ fontSize: `${Math.max(10, Math.min(logoHeight, logoWidth) / 2)}px` }}>
+            {logoInitials || "CH"}
+          </span>
         </div>
         <div className="flex min-w-0 flex-col">
-          <span className={`truncate font-black tracking-widest text-[#111418] leading-none group-hover:text-[#C5A880] transition-colors ${compact ? "text-sm" : "text-base"}`}>
+          <span className={`truncate whitespace-nowrap font-black tracking-widest text-[#111418] leading-none group-hover:text-[#C5A880] transition-colors ${compact ? "text-sm" : "text-base"}`}>
             {logoText}
           </span>
-          <span className="truncate text-[9px] font-extrabold tracking-[0.25em] text-[#C5A880] uppercase mt-0.5">
+          <span className="truncate whitespace-nowrap text-[9px] font-extrabold tracking-[0.25em] text-[#C5A880] uppercase mt-0.5">
             {subtitle}
           </span>
         </div>
@@ -135,12 +145,12 @@ export default function GlassHeader() {
         {/* Upper bar with thin design */}
         <div className="hidden sm:flex bg-[#111418] text-slate-300 text-xs py-2 px-6 justify-between items-center border-b border-[#C5A880]/10">
           <div className="flex items-center space-x-6 font-medium">
-            <a href="tel:+41791234567" className="flex items-center space-x-1.5 hover:text-[#C5A880] transition-colors">
+            <a href={`tel:${siteSettings?.phone || '+41791234567'}`} className="flex items-center space-x-1.5 hover:text-[#C5A880] transition-colors">
               <Phone className="w-3.5 h-3.5 text-[#C5A880]" />
-              <span className="tracking-wide">+41 79 123 45 67</span>
+              <span className="tracking-wide">{siteSettings?.phone || '+41 79 123 45 67'}</span>
             </a>
             <span className="text-[#C5A880]/20">|</span>
-            <span className="tracking-wide text-slate-400">{t("common.hours_val")}</span>
+            <span className="tracking-wide text-slate-400">{siteSettings?.opening_hours || t("common.hours_val")}</span>
           </div>
           <div className="flex items-center space-x-4">
             <span className="border border-[#C5A880]/30 text-[#C5A880] px-2.5 py-0.5 text-[9px] font-bold tracking-widest uppercase rounded-sm">
@@ -158,7 +168,7 @@ export default function GlassHeader() {
         {/* Main Navigation Bar */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 min-h-22 py-4 flex items-center justify-between gap-4">
           {/* Logo */}
-          <Link href="/" className="group min-w-0">
+          <Link href="/" className="group min-w-0 flex-shrink-0">
             {renderLogo(true)}
           </Link>
 
@@ -169,7 +179,7 @@ export default function GlassHeader() {
                 key={item.path}
                 href={item.path}
                 data-testid={item.path === "/" ? NAV.home : `nav-${item.path.slice(1)}-link`}
-                className={`text-[11px] font-black uppercase tracking-widest transition-colors hover:text-[#C5A880] py-2 ${
+                className={`text-[11px] font-black uppercase tracking-widest transition-colors hover:text-[#C5A880] py-2 whitespace-nowrap ${
                   location === item.path ? "text-[#C5A880] border-b border-[#C5A880]" : "text-slate-800"
                 }`}
               >

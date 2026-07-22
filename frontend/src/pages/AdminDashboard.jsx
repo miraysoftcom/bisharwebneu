@@ -19,14 +19,25 @@ const DEFAULT_GLOBAL_SETTINGS = {
     site_name: "Swiss Platten",
     company_name: "Swiss Platten GmbH",
     phone: "+41 79 123 45 67",
+    opening_hours: "Mo-Fr: 09:00 - 18:00 | Sa: 10:00 - 16:00",
     email: "info@plattenlegerallerart.ch",
     address: "Bahnhofstrasse 30, 5430 Wettingen",
     uid: "CHE-123.456.789 MWST",
     logo_mode: "text",
     logo_text: "SWISS PLATTEN",
+    logo_initials: "SP",
     logo_subtitle: "Atelier d'Architecture",
     logo_image_url: "",
-    logo_image_alt: "Swiss Platten Logo"
+    logo_image_height: "40",
+    logo_image_width: "40",
+    logo_image_alt: "Swiss Platten Logo",
+    footer_description: "Ihr zertifizierter Schweizer Meisterbetrieb für exklusive Plattenlegearbeiten, präzise Bodenschleiftechnik und langlebige Spezialabdichtungen. Handwerk auf höchstem Niveau.",
+    footer_copyright: "© 2024 Swiss Platten GmbH. Alle Rechte vorbehalten.",
+    footer_phone: "+41 79 123 45 67",
+    footer_opening_hours: "Mo-Fr: 09:00 - 18:00 | Sa: 10:00 - 16:00",
+    footer_email: "info@plattenlegerallerart.ch",
+    footer_address: "Bahnhofstrasse 30, 5430 Wettingen",
+    footer_bg_color: "#0f172a"
   },
   smtp: {
     host: "smtp.plattenlegerallerart.ch",
@@ -96,6 +107,23 @@ export default function AdminDashboard() {
     image_desktop: "", bg_color: "rgb(17, 20, 24)", active: true
   });
   const [pages, setPages] = useState([]);
+  const [projects, setProjects] = useState([]);
+  const [projectForm, setProjectForm] = useState({
+    id: "",
+    title: "",
+    slug: "",
+    category: "commercial",
+    image_url: "",
+    location: "",
+    duration: "",
+    materials: "",
+    works: "",
+    desc: "",
+    active: true,
+    featured: false,
+    order: 0
+  });
+  const [editingProject, setEditingProject] = useState(false);
   const [reviews, setReviews] = useState([]);
   const [faqs, setFaqs] = useState([]);
   const [contacts, setContacts] = useState([]);
@@ -165,6 +193,8 @@ export default function AdminDashboard() {
 
   // --- BRANDING & SMTP GLOBAL VARIABLES SETTINGS ---
   const [globalSettings, setGlobalSettings] = useState(DEFAULT_GLOBAL_SETTINGS);
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
+  const [saveMessage, setSaveMessage] = useState("");
   const [logoUploadLoading, setLogoUploadLoading] = useState(false);
   const [teamPhotoUploadLoading, setTeamPhotoUploadLoading] = useState(false);
 
@@ -298,7 +328,7 @@ export default function AdminDashboard() {
       const [
         statsRes, quotesRes, contractsRes, slidersRes, 
         reviewsRes, faqsRes, contactsRes, callbacksRes, 
-        notifsRes, pagesRes, logsRes, settingsRes, emailLogsRes, bannersRes, serviceAreasRes, teamRes, serviceAreaSectionRes
+        notifsRes, pagesRes, projectsRes, logsRes, settingsRes, emailLogsRes, bannersRes, serviceAreasRes, teamRes, serviceAreaSectionRes
       ] = await Promise.all([
         axios.get(`${API}/admin/stats`),
         axios.get(`${API}/admin/quotes`),
@@ -310,6 +340,7 @@ export default function AdminDashboard() {
         axios.get(`${API}/admin/callbacks`),
         axios.get(`${API}/admin/notifications`),
         axios.get(`${API}/admin/pages`),
+        axios.get(`${API}/admin/projects`),
         axios.get(`${API}/admin/audit-logs`),
         axios.get(`${API}/admin/settings`),
         axios.get(`${API}/admin/email-logs`),
@@ -328,6 +359,7 @@ export default function AdminDashboard() {
       setCallbacks(callbacksRes.data);
       setNotifications(notifsRes.data);
       setPages(pagesRes.data);
+      setProjects(projectsRes.data);
       setAuditLogs(logsRes.data);
       setEmailLogs(emailLogsRes.data);
       setBanners(bannersRes.data);
@@ -742,6 +774,69 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleProjectSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const payload = {
+        ...projectForm,
+        slug: projectForm.slug.trim().toLowerCase().replace(/\s+/g, "-"),
+      };
+      if (projectForm.id) {
+        await axios.put(`${API}/admin/projects/${projectForm.id}`, payload);
+      } else {
+        await axios.post(`${API}/admin/projects`, payload);
+      }
+      setEditingProject(false);
+      setProjectForm({
+        id: "",
+        title: "",
+        slug: "",
+        category: "commercial",
+        image_url: "",
+        location: "",
+        duration: "",
+        materials: "",
+        works: "",
+        desc: "",
+        active: true,
+        featured: false,
+        order: 0
+      });
+      fetchAllData();
+    } catch (err) {
+      alert(err.response?.data?.detail || "Projekt speichern fehlgeschlagen.");
+    }
+  };
+
+  const handleDeleteProject = async (id) => {
+    if (!window.confirm("Projekt wirklich löschen?")) return;
+    try {
+      await axios.delete(`${API}/admin/projects/${id}`);
+      fetchAllData();
+    } catch (err) {
+      await handleAuthFailure(err, "Projekt löschen fehlgeschlagen.");
+    }
+  };
+
+  const handleEditProject = (project) => {
+    setProjectForm({
+      id: project.id,
+      title: project.title || "",
+      slug: project.slug || "",
+      category: project.category || "commercial",
+      image_url: project.image_url || "",
+      location: project.location || "",
+      duration: project.duration || "",
+      materials: project.materials || "",
+      works: project.works || "",
+      desc: project.desc || "",
+      active: project.active !== false,
+      featured: project.featured !== false,
+      order: project.order || 0
+    });
+    setEditingProject(true);
+  };
+
   // --- CHAT MESSAGE CLIENT / ADMIN ---
   const handleSendChatMessage = async (e) => {
     e.preventDefault();
@@ -1012,6 +1107,7 @@ export default function AdminDashboard() {
     { id: "quotes", label: "Offerten", icon: <FileText className="w-4 h-4" /> },
     { id: "contracts", label: "Verträge", icon: <FileSignature className="w-4 h-4" /> },
     { id: "pages", label: "Seiten CMS", icon: <Layers className="w-4 h-4" /> },
+    { id: "projects", label: "Projekte", icon: <Monitor className="w-4 h-4" /> },
     { id: "sliders", label: "Hero Slider", icon: <Sliders className="w-4 h-4" /> },
     { id: "faqs", label: "FAQs & Reviews", icon: <HelpCircle className="w-4 h-4" /> },
     { id: "serviceareas", label: "Einsatzgebiete", icon: <MapPin className="w-4 h-4" /> },
@@ -1413,6 +1509,240 @@ export default function AdminDashboard() {
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 4: PROJEKTE CMS */}
+          {activeTab === "projects" && (
+            <div className="bg-white border border-slate-200 p-8 rounded shadow-sm space-y-6">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <h3 className="text-lg font-black text-slate-900 tracking-tight">Projekte</h3>
+                  <p className="text-sm text-slate-500 mt-1">Verwalten Sie Ihre Referenzprojekte, Bildmaterial und Kategorie-Details an einem zentralen Ort.</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setProjectForm({
+                      id: "",
+                      title: "",
+                      slug: "",
+                      category: "commercial",
+                      image_url: "",
+                      location: "",
+                      duration: "",
+                      materials: "",
+                      works: "",
+                      desc: "",
+                      active: true,
+                      featured: false,
+                      order: 0
+                    });
+                    setEditingProject(true);
+                  }}
+                  className="bg-[#C5A880] hover:bg-[#AF8E5E] text-slate-950 text-xs font-black uppercase tracking-[0.2em] px-4 py-2.5 rounded inline-flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  Neues Projekt
+                </button>
+              </div>
+
+              {editingProject && (
+                <form onSubmit={handleProjectSubmit} className="bg-slate-50 border border-slate-200 p-6 rounded space-y-6 animate-in fade-in">
+                  <div className="grid grid-cols-1 xl:grid-cols-[1fr_0.75fr] gap-6">
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <label className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">Projekttitel</label>
+                          <input
+                            type="text"
+                            value={projectForm.title}
+                            onChange={(e) => setProjectForm({ ...projectForm, title: e.target.value })}
+                            className="w-full rounded border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-900"
+                            required
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">URL Slug</label>
+                          <input
+                            type="text"
+                            value={projectForm.slug}
+                            onChange={(e) => setProjectForm({ ...projectForm, slug: e.target.value })}
+                            className="w-full rounded border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-900"
+                            placeholder="luxus-badezimmer"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <label className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">Kategorie</label>
+                          <select
+                            value={projectForm.category}
+                            onChange={(e) => setProjectForm({ ...projectForm, category: e.target.value })}
+                            className="w-full rounded border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-900"
+                          >
+                            <option value="bathroom">Badezimmer</option>
+                            <option value="outdoor">Terrasse</option>
+                            <option value="flooring">Boden</option>
+                            <option value="waterproofing">Abdichtung</option>
+                            <option value="commercial">Gewerbe</option>
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">Ort</label>
+                          <input
+                            type="text"
+                            value={projectForm.location}
+                            onChange={(e) => setProjectForm({ ...projectForm, location: e.target.value })}
+                            className="w-full rounded border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-900"
+                            placeholder="Zürich"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <label className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">Dauer</label>
+                          <input
+                            type="text"
+                            value={projectForm.duration}
+                            onChange={(e) => setProjectForm({ ...projectForm, duration: e.target.value })}
+                            className="w-full rounded border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-900"
+                            placeholder="8 Tage"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">Status</label>
+                          <div className="flex items-center gap-4">
+                            <label className="inline-flex items-center gap-2 text-sm text-slate-600">
+                              <input type="checkbox" checked={projectForm.active} onChange={(e) => setProjectForm({ ...projectForm, active: e.target.checked })} /> Aktiv
+                            </label>
+                            <label className="inline-flex items-center gap-2 text-sm text-slate-600">
+                              <input type="checkbox" checked={projectForm.featured} onChange={(e) => setProjectForm({ ...projectForm, featured: e.target.checked })} /> Featured
+                            </label>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">Bild-URL</label>
+                        <input
+                          type="text"
+                          value={projectForm.image_url}
+                          onChange={(e) => setProjectForm({ ...projectForm, image_url: e.target.value })}
+                          className="w-full rounded border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-900"
+                          placeholder="https://..."
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">Materialien</label>
+                        <input
+                          type="text"
+                          value={projectForm.materials}
+                          onChange={(e) => setProjectForm({ ...projectForm, materials: e.target.value })}
+                          className="w-full rounded border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-900"
+                          placeholder="Feinsteinzeug, Epoxidharz"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="space-y-1">
+                        <label className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">Kurzbeschreibung</label>
+                        <textarea
+                          rows={6}
+                          value={projectForm.desc}
+                          onChange={(e) => setProjectForm({ ...projectForm, desc: e.target.value })}
+                          className="w-full rounded border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900"
+                          placeholder="Beschreiben Sie die Projekt-Highlights."
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">Arbeiten / Scope</label>
+                        <textarea
+                          rows={4}
+                          value={projectForm.works}
+                          onChange={(e) => setProjectForm({ ...projectForm, works: e.target.value })}
+                          className="w-full rounded border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900"
+                          placeholder="Untergrundvorbereitung, Abdichtung, Verlegung..."
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">Sortierreihenfolge</label>
+                        <input
+                          type="number"
+                          value={projectForm.order}
+                          onChange={(e) => setProjectForm({ ...projectForm, order: Number(e.target.value) })}
+                          className="w-full rounded border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-900"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center pt-4 border-t border-slate-200">
+                    <button type="button" onClick={() => setEditingProject(false)} className="px-4 py-2 border rounded text-xs font-bold uppercase">Abbrechen</button>
+                    <button type="submit" className="bg-[#C5A880] text-slate-950 px-5 py-2 text-xs font-black uppercase rounded hover:bg-[#AF8E5E]">Projekt speichern</button>
+                  </div>
+                </form>
+              )}
+
+              <div className="grid gap-4">
+                {projects.length === 0 ? (
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center text-sm text-slate-500">
+                    Noch keine Projekte vorhanden. Erstellen Sie ein neues Projekt, um Ihre Referenzen zu präsentieren.
+                  </div>
+                ) : (
+                  projects.map((project) => (
+                    <div key={project.id} className="rounded-3xl border border-slate-200 bg-slate-50 p-6 shadow-sm transition hover:shadow-md">
+                      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+                        <div className="max-w-3xl">
+                          <div className="flex flex-wrap items-center gap-3 mb-3">
+                            <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${project.active ? "text-emerald-700" : "text-slate-500"}`}>{project.active ? "AKTIV" : "INAKTIV"}</span>
+                            {project.featured && <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[#C5A880]">FEATURED</span>}
+                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Kategorie: {project.category}</span>
+                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Ordnung: {project.order}</span>
+                          </div>
+                          <h4 className="text-xl font-black text-slate-900 tracking-tight">{project.title}</h4>
+                          <p className="text-sm text-slate-500 mt-2">{project.desc}</p>
+                          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                            <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                              <span className="block text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Ort</span>
+                              <span className="font-bold text-slate-800">{project.location || "—"}</span>
+                            </div>
+                            <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                              <span className="block text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Dauer</span>
+                              <span className="font-bold text-slate-800">{project.duration || "—"}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex flex-col gap-3 sm:items-end">
+                          {project.image_url ? (
+                            <img src={project.image_url} alt={project.title} className="h-40 w-72 rounded-3xl object-cover border border-slate-200 shadow-sm" />
+                          ) : (
+                            <div className="h-40 w-72 rounded-3xl bg-slate-900 text-white grid place-items-center text-sm font-black uppercase tracking-[0.2em]">Kein Bild</div>
+                          )}
+                          <div className="flex flex-wrap gap-2">
+                            <button onClick={() => handleEditProject(project)} className="rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-black uppercase tracking-[0.2em] text-slate-700 hover:border-[#C5A880] hover:text-[#C5A880]">Bearbeiten</button>
+                            <button onClick={() => handleDeleteProject(project.id)} className="rounded-full border border-red-200 bg-white px-4 py-2 text-xs font-black uppercase tracking-[0.2em] text-red-600 hover:bg-red-50">Löschen</button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 grid gap-3 sm:grid-cols-2 text-sm text-slate-600">
+                        <div>
+                          <span className="block text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Materialien</span>
+                          <span>{project.materials || "—"}</span>
+                        </div>
+                        <div>
+                          <span className="block text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Leistungen</span>
+                          <span>{project.works || "—"}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           )}
@@ -1909,7 +2239,7 @@ export default function AdminDashboard() {
                           onClick={() => setActiveContactTicket(c)}
                           className="bg-slate-900 hover:bg-slate-800 text-white text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-sm"
                         >
-                          Cevap Yaz
+                          Antwort Schreiben
                         </button>
                       </div>
                     </div>
@@ -2236,10 +2566,10 @@ export default function AdminDashboard() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
                 {/* General Settings */}
                 <div className="space-y-4 bg-slate-50 p-6 rounded border border-slate-150">
-                  <h4 className="text-xs font-black uppercase text-slate-500 tracking-widest border-b pb-2">Kurumsal Firma Bilgileri</h4>
+                  <h4 className="text-xs font-black uppercase text-slate-500 tracking-widest border-b pb-2">Firma-Informationen</h4>
                   <div className="space-y-3 font-semibold text-xs uppercase tracking-wider text-slate-400">
                     <div className="space-y-1">
-                      <label>Firmenname (Slogan)</label>
+                      <label>Firmenname</label>
                       <input 
                         type="text" value={globalSettings.general.company_name}
                         onChange={(e) => setGlobalSettings({
@@ -2250,23 +2580,23 @@ export default function AdminDashboard() {
                       />
                     </div>
                     <div className="space-y-1">
-                      <label>Telefon</label>
-                      <input 
-                        type="text" value={globalSettings.general.phone}
-                        onChange={(e) => setGlobalSettings({
-                          ...globalSettings,
-                          general: { ...globalSettings.general, phone: e.target.value }
-                        })}
-                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-xs font-bold text-slate-800"
-                      />
-                    </div>
-                    <div className="space-y-1">
                       <label>UID / MWST-Nummer</label>
                       <input 
                         type="text" value={globalSettings.general.uid}
                         onChange={(e) => setGlobalSettings({
                           ...globalSettings,
                           general: { ...globalSettings.general, uid: e.target.value }
+                        })}
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-xs font-bold text-slate-800"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label>Adresse</label>
+                      <input 
+                        type="text" value={globalSettings.general.address}
+                        onChange={(e) => setGlobalSettings({
+                          ...globalSettings,
+                          general: { ...globalSettings.general, address: e.target.value }
                         })}
                         className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-xs font-bold text-slate-800"
                       />
@@ -2304,42 +2634,127 @@ export default function AdminDashboard() {
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-1">
-                        <label>Logo-Text</label>
-                        <input
-                          type="text"
-                          value={globalSettings.general.logo_text}
-                          onChange={(e) => setGlobalSettings({
-                            ...globalSettings,
-                            general: { ...globalSettings.general, logo_text: e.target.value }
-                          })}
-                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-xs font-bold text-slate-800"
-                        />
+                      {/* TEXT LOGO SECTION */}
+                      <div className="space-y-3 bg-slate-50 p-4 rounded border border-slate-150">
+                        <h6 className="text-[10px] font-black uppercase tracking-widest text-slate-600 border-b pb-2">Text-Logo Einstellungen</h6>
+                        <div className="space-y-2">
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-black uppercase tracking-wider text-slate-500">Logo-Text (Haupttitel)</label>
+                            <input
+                              type="text"
+                              value={globalSettings.general.logo_text}
+                              onChange={(e) => setGlobalSettings({
+                                ...globalSettings,
+                                general: { ...globalSettings.general, logo_text: e.target.value }
+                              })}
+                              className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-xs font-bold text-slate-800"
+                              placeholder="z.B. SWISS PLATTEN"
+                            />
+                            <p className="text-[9px] text-slate-400 font-medium">Der Haupttitel des Logos, der im Header angezeigt wird.</p>
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-black uppercase tracking-wider text-slate-500">Logo-Untertitel</label>
+                            <input
+                              type="text"
+                              value={globalSettings.general.logo_subtitle || ""}
+                              onChange={(e) => setGlobalSettings({
+                                ...globalSettings,
+                                general: { ...globalSettings.general, logo_subtitle: e.target.value }
+                              })}
+                              className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-xs font-bold text-slate-800"
+                              placeholder="z.B. Atelier d'Architecture"
+                            />
+                            <p className="text-[9px] text-slate-400 font-medium">Optionaler Untertitel unter dem Haupttext.</p>
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-black uppercase tracking-wider text-slate-500">Logo-Initiale (Box)</label>
+                            <input
+                              type="text"
+                              value={globalSettings.general.logo_initials || ""}
+                              onChange={(e) => setGlobalSettings({
+                                ...globalSettings,
+                                general: { ...globalSettings.general, logo_initials: e.target.value.toUpperCase().slice(0, 4) }
+                              })}
+                              maxLength="4"
+                              className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-xs font-bold text-slate-800 text-center"
+                              placeholder="z.B. SP"
+                            />
+                            <p className="text-[9px] text-slate-400 font-medium">Zeichen in der schwarzen Box (max. 4 Zeichen). Beispiel: SP, PLA, etc.</p>
+                          </div>
+                        </div>
                       </div>
-                      <div className="space-y-1">
-                        <label>Alt-Text des Logos</label>
-                        <input
-                          type="text"
-                          value={globalSettings.general.logo_image_alt}
-                          onChange={(e) => setGlobalSettings({
-                            ...globalSettings,
-                            general: { ...globalSettings.general, logo_image_alt: e.target.value }
-                          })}
-                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-xs font-bold text-slate-800"
-                        />
-                      </div>
-                      <div className="space-y-1 md:col-span-2">
-                        <label>Logo Bild-URL</label>
-                        <input
-                          type="text"
-                          value={globalSettings.general.logo_image_url}
-                          onChange={(e) => setGlobalSettings({
-                            ...globalSettings,
-                            general: { ...globalSettings.general, logo_image_url: e.target.value, logo_mode: "image" }
-                          })}
-                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-xs font-bold text-slate-800"
-                          placeholder="/uploads/..."
-                        />
+
+                      {/* IMAGE LOGO SECTION */}
+                      <div className="space-y-3 bg-slate-50 p-4 rounded border border-slate-150">
+                        <h6 className="text-[10px] font-black uppercase tracking-widest text-slate-600 border-b pb-2">Bild-Logo Einstellungen</h6>
+                        <div className="space-y-2">
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-black uppercase tracking-wider text-slate-500">Logo Bild-URL</label>
+                            <input
+                              type="text"
+                              value={globalSettings.general.logo_image_url}
+                              onChange={(e) => setGlobalSettings({
+                                ...globalSettings,
+                                general: { ...globalSettings.general, logo_image_url: e.target.value, logo_mode: "image" }
+                              })}
+                              className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-xs font-bold text-slate-800"
+                              placeholder="/uploads/logo.png"
+                            />
+                            <p className="text-[9px] text-slate-400 font-medium">Vollständiger Pfad zur Bilddatei.</p>
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-black uppercase tracking-wider text-slate-500">Alt-Text des Logos</label>
+                            <input
+                              type="text"
+                              value={globalSettings.general.logo_image_alt}
+                              onChange={(e) => setGlobalSettings({
+                                ...globalSettings,
+                                general: { ...globalSettings.general, logo_image_alt: e.target.value }
+                              })}
+                              className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-xs font-bold text-slate-800"
+                              placeholder="z.B. Swiss Platten Logo"
+                            />
+                            <p className="text-[9px] text-slate-400 font-medium">Beschreibung für Accessibility & SEO.</p>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-black uppercase tracking-wider text-slate-500">Höhe (Height)</label>
+                              <div className="flex items-center gap-1">
+                                <input
+                                  type="number"
+                                  value={globalSettings.general.logo_image_height || "40"}
+                                  onChange={(e) => setGlobalSettings({
+                                    ...globalSettings,
+                                    general: { ...globalSettings.general, logo_image_height: e.target.value }
+                                  })}
+                                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-xs font-bold text-slate-800"
+                                  placeholder="40"
+                                  min="10"
+                                  max="200"
+                                />
+                                <span className="text-[10px] font-bold text-slate-500">px</span>
+                              </div>
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[10px] font-black uppercase tracking-wider text-slate-500">Breite (Width)</label>
+                              <div className="flex items-center gap-1">
+                                <input
+                                  type="number"
+                                  value={globalSettings.general.logo_image_width || "40"}
+                                  onChange={(e) => setGlobalSettings({
+                                    ...globalSettings,
+                                    general: { ...globalSettings.general, logo_image_width: e.target.value }
+                                  })}
+                                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-xs font-bold text-slate-800"
+                                  placeholder="40"
+                                  min="10"
+                                  max="200"
+                                />
+                                <span className="text-[10px] font-bold text-slate-500">px</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     </div>
 
@@ -2358,11 +2773,21 @@ export default function AdminDashboard() {
                           <img
                             src={globalSettings.general.logo_image_url.startsWith("http") ? globalSettings.general.logo_image_url : `${BACKEND_URL}${globalSettings.general.logo_image_url}`}
                             alt={globalSettings.general.logo_image_alt || globalSettings.general.company_name}
-                            className="h-10 w-10 rounded object-cover border border-slate-200"
+                            style={{ 
+                              height: `${globalSettings.general.logo_image_height || 40}px`, 
+                              width: `${globalSettings.general.logo_image_width || 40}px` 
+                            }}
+                            className="rounded object-cover border border-slate-200"
                           />
                         ) : (
-                          <div className="w-10 h-10 bg-slate-900 border border-[#C5A880]/30 flex items-center justify-center font-black text-[#C5A880] text-xs tracking-tighter rounded-sm">
-                            {globalSettings.general.logo_text || "CH"}
+                          <div 
+                            style={{ 
+                              width: `${globalSettings.general.logo_image_width || 40}px`, 
+                              height: `${globalSettings.general.logo_image_height || 40}px` 
+                            }}
+                            className="bg-slate-900 border border-[#C5A880]/30 flex items-center justify-center font-black text-[#C5A880] text-xs tracking-tighter rounded-sm"
+                          >
+                            {globalSettings.general.logo_initials || globalSettings.general.logo_text?.slice(0, 2).toUpperCase() || "CH"}
                           </div>
                         )}
                         <div className="flex flex-col">
@@ -2588,6 +3013,148 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
+                {/* Header & Footer Einstellungen */}
+                <div className="space-y-4 bg-slate-50 p-6 rounded border border-slate-150">
+                  <h4 className="text-xs font-black uppercase text-slate-500 tracking-widest border-b pb-2">Header & Footer Einstellungen</h4>
+                  <div className="space-y-4 font-semibold text-xs uppercase tracking-wider text-slate-400">
+                    {/* Header Section */}
+                    <div className="bg-white p-4 rounded border border-slate-200">
+                      <p className="text-[10px] font-black text-slate-600 mb-3 pb-2 border-b">📱 Header</p>
+                      <div className="space-y-3">
+                        <div className="space-y-1">
+                          <label>Telefonnummer (Header)</label>
+                          <input 
+                            type="text" value={globalSettings.general.phone}
+                            onChange={(e) => setGlobalSettings({
+                              ...globalSettings,
+                              general: { ...globalSettings.general, phone: e.target.value }
+                            })}
+                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-xs font-bold text-slate-800"
+                            placeholder="+41 79 123 45 67"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label>Öffnungszeiten (Header)</label>
+                          <input 
+                            type="text" value={globalSettings.general.opening_hours || ""}
+                            onChange={(e) => setGlobalSettings({
+                              ...globalSettings,
+                              general: { ...globalSettings.general, opening_hours: e.target.value }
+                            })}
+                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-xs font-bold text-slate-800"
+                            placeholder="z.B. Mo-Fr: 09:00 - 18:00 | Sa: 10:00 - 16:00"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Footer Section */}
+                    <div className="bg-white p-4 rounded border border-slate-200">
+                      <p className="text-[10px] font-black text-slate-600 mb-3 pb-2 border-b">🔗 Footer</p>
+                      <div className="space-y-3">
+                        <div className="space-y-1">
+                          <label>Footer-Beschreibung</label>
+                          <textarea 
+                            value={globalSettings.general.footer_description || ""}
+                            onChange={(e) => setGlobalSettings({
+                              ...globalSettings,
+                              general: { ...globalSettings.general, footer_description: e.target.value }
+                            })}
+                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-xs font-bold text-slate-800"
+                            placeholder="Kurze Unternehmensbeschreibung für den Footer..."
+                            rows="2"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label>Copyright-Text</label>
+                          <input 
+                            type="text" value={globalSettings.general.footer_copyright || ""}
+                            onChange={(e) => setGlobalSettings({
+                              ...globalSettings,
+                              general: { ...globalSettings.general, footer_copyright: e.target.value }
+                            })}
+                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-xs font-bold text-slate-800"
+                            placeholder="© 2024 Swiss Platten GmbH. Alle Rechte vorbehalten."
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label>Telefon (Footer)</label>
+                          <input 
+                            type="text" value={globalSettings.general.footer_phone || ""}
+                            onChange={(e) => setGlobalSettings({
+                              ...globalSettings,
+                              general: { ...globalSettings.general, footer_phone: e.target.value }
+                            })}
+                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-xs font-bold text-slate-800"
+                            placeholder="+41 79 123 45 67"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label>Öffnungszeiten (Footer)</label>
+                          <input 
+                            type="text" value={globalSettings.general.footer_opening_hours || ""}
+                            onChange={(e) => setGlobalSettings({
+                              ...globalSettings,
+                              general: { ...globalSettings.general, footer_opening_hours: e.target.value }
+                            })}
+                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-xs font-bold text-slate-800"
+                            placeholder="z.B. Mo-Fr: 09:00 - 18:00 | Sa: 10:00 - 16:00"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label>Footer Hintergrundfarbe</label>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="color"
+                              value={globalSettings.general.footer_bg_color || "#0f172a"}
+                              onChange={(e) => setGlobalSettings({
+                                ...globalSettings,
+                                general: { ...globalSettings.general, footer_bg_color: e.target.value }
+                              })}
+                              className="h-12 w-12 rounded border border-slate-200 bg-white p-1"
+                            />
+                            <input
+                              type="text"
+                              value={globalSettings.general.footer_bg_color || "#0f172a"}
+                              onChange={(e) => setGlobalSettings({
+                                ...globalSettings,
+                                general: { ...globalSettings.general, footer_bg_color: e.target.value }
+                              })}
+                              className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-xs font-bold text-slate-800"
+                              placeholder="#0f172a"
+                            />
+                          </div>
+                          <p className="text-[9px] text-slate-400 font-medium">Footer arka plan rengini seçin ya da hex kodunu girin.</p>
+                        </div>
+                        <div className="space-y-1">
+                          <label>Email (Footer)</label>
+                          <input 
+                            type="email" value={globalSettings.general.footer_email || ""}
+                            onChange={(e) => setGlobalSettings({
+                              ...globalSettings,
+                              general: { ...globalSettings.general, footer_email: e.target.value }
+                            })}
+                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-xs font-bold text-slate-800"
+                            placeholder="info@plattenlegerallerart.ch"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label>Adresse (Footer)</label>
+                          <input 
+                            type="text" value={globalSettings.general.footer_address || ""}
+                            onChange={(e) => setGlobalSettings({
+                              ...globalSettings,
+                              general: { ...globalSettings.general, footer_address: e.target.value }
+                            })}
+                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-xs font-bold text-slate-800"
+                            placeholder="Bahnhofstrasse 30, 5430 Wettingen"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 {/* SMTP configuration */}
                 <div className="space-y-4 bg-slate-50 p-6 rounded border border-slate-150">
                   <div className="flex justify-between items-center border-b pb-2 border-slate-200">
@@ -2720,13 +3287,29 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              <div className="flex justify-end pt-4 border-t">
+              <div className="flex justify-end pt-4 border-t gap-4 items-center">
+                {saveMessage && (
+                  <div className={`text-xs font-bold px-4 py-2 rounded ${saveMessage.includes("Fehler") ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}`}>
+                    {saveMessage}
+                  </div>
+                )}
                 <button 
                   onClick={async () => {
-                    await axios.put(`${API}/admin/settings`, globalSettings);
-                    alert("Einstellungen erfolgreich in der Datenbank gespeichert und aktualisiert!");
+                    setIsSavingSettings(true);
+                    setSaveMessage("");
+                    try {
+                      await axios.put(`${API}/admin/settings`, globalSettings);
+                      setSaveMessage("✅ Einstellungen erfolgreich gespeichert!");
+                      setTimeout(() => setSaveMessage(""), 3000);
+                    } catch (error) {
+                      setSaveMessage("❌ Fehler beim Speichern. Bitte versuchen Sie es erneut.");
+                      setTimeout(() => setSaveMessage(""), 3000);
+                    } finally {
+                      setIsSavingSettings(false);
+                    }
                   }}
-                  className="bg-slate-900 hover:bg-slate-850 text-white font-extrabold text-[10px] tracking-widest uppercase px-6 py-4 rounded-sm flex items-center space-x-2"
+                  disabled={isSavingSettings}
+                  className={`font-extrabold text-[10px] tracking-widest uppercase px-6 py-4 rounded-sm flex items-center space-x-2 transition-all ${isSavingSettings ? "bg-slate-400 cursor-not-allowed text-white" : "bg-slate-900 hover:bg-slate-850 text-white"}`}
                 >
                   <Save className="w-4 h-4 text-[#C5A880]" />
                   <span>Systemeinstellungen speichern</span>

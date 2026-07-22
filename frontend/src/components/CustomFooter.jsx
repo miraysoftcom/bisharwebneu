@@ -26,10 +26,14 @@ export default function CustomFooter() {
   };
 
   const getCompanyName = () => settings?.company_name || "Swiss Platten GmbH";
-  const getAddress = () => settings?.address || "Bahnhofstrasse 30, 5430 Wettingen";
-  const getPhone = () => settings?.phone || "+41 79 123 45 67";
-  const getEmail = () => settings?.email || "info@plattenlegerallerart.ch";
+  const getAddress = () => settings?.footer_address || settings?.address || "Bahnhofstrasse 30, 5430 Wettingen";
+  const getPhone = () => settings?.footer_phone || settings?.phone || "+41 79 123 45 67";
+  const getEmail = () => settings?.footer_email || settings?.email || "info@plattenlegerallerart.ch";
   const getUid = () => settings?.uid || "CHE-123.456.789 MWST";
+  const getDescription = () => settings?.footer_description || "Ihr zertifizierter Schweizer Meisterbetrieb für exklusive Plattenlegearbeiten, präzise Bodenschleiftechnik und langlebige Spezialabdichtungen. Handwerk auf höchstem Niveau.";
+  const getCopyright = () => settings?.footer_copyright || `© 2024 ${settings?.company_name || "Swiss Platten GmbH"}. Alle Rechte vorbehalten.`;
+  const getOpeningHours = () => settings?.footer_opening_hours || settings?.opening_hours || "Mo-Fr: 09:00 - 18:00 | Sa: 10:00 - 16:00";
+  const getFooterBgColor = () => settings?.footer_bg_color || "#0f172a";
   const getLogoMode = () => settings?.logo_mode || "text";
   const getLogoText = () => settings?.logo_text || settings?.site_name || settings?.company_name || "Swiss Platten";
   const getLogoSubtitle = () => settings?.logo_subtitle || "Boden & Abdichtung";
@@ -39,7 +43,7 @@ export default function CustomFooter() {
   };
 
   return (
-    <footer className="bg-slate-900 text-slate-300 border-t border-[#C5A880]/15 transition-all duration-300">
+    <footer className="text-slate-300 border-t border-[#C5A880]/15 transition-all duration-300" style={{ backgroundColor: getFooterBgColor() }}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
           {/* Brand Col */}
@@ -78,8 +82,7 @@ export default function CustomFooter() {
               )}
             </Link>
             <p className="text-sm text-slate-400 leading-relaxed font-semibold">
-              Ihr zertifizierter Schweizer Meisterbetrieb für exklusive Plattenlegearbeiten, 
-              präzise Bodenschleiftechnik und langlebige Spezialabdichtungen. Handwerk auf höchstem Niveau.
+              {getDescription()}
             </p>
             <div className="flex space-x-3">
               <span className="text-[10px] font-bold tracking-wider bg-slate-950 text-[#C5A880] border border-[#C5A880]/20 px-3 py-1.5 uppercase rounded-sm">
@@ -178,10 +181,17 @@ export default function CustomFooter() {
                 </div>
               </li>
               <li className="flex items-start space-x-3">
+                <MapPin className="w-5 h-5 text-[#C5A880] mt-0.5 shrink-0" />
+                <div>
+                  <span className="block text-[9px] font-black text-slate-500 uppercase tracking-widest">ADRESSE</span>
+                  <span className="text-slate-400 font-semibold">{getAddress()}</span>
+                </div>
+              </li>
+              <li className="flex items-start space-x-3">
                 <Clock className="w-5 h-5 text-[#C5A880] mt-0.5 shrink-0" />
                 <div>
                   <span className="block text-[9px] font-black text-slate-500 uppercase tracking-widest">ÖFFNUNGSZEITEN</span>
-                  <span className="text-slate-400 font-semibold">{t("common.hours_val")}</span>
+                  <span className="text-slate-400 font-semibold">{getOpeningHours()}</span>
                 </div>
               </li>
             </ul>
@@ -190,7 +200,7 @@ export default function CustomFooter() {
 
         {/* Footer Bottom Bar */}
         <div className="mt-16 pt-8 border-t border-slate-800 text-xs text-slate-500 flex flex-col sm:flex-row justify-between items-center gap-4">
-          <p>© 2026 {getCompanyName()}. Alle Rechte vorbehalten. Schweizer Handwerks-Qualität. UID: {getUid()}</p>
+          <p>{getCopyright()} UID: {getUid()}</p>
           <div className="flex space-x-6">
             <Link href="/impressum" onClick={handleScrollTop} className="hover:text-[#C5A880] transition-colors">
               Impressum

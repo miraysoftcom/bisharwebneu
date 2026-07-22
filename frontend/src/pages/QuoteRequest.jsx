@@ -173,7 +173,7 @@ export default function QuoteRequest() {
       }
       if (postcodeCheck.checked && !postcodeCheck.allowed) {
         // Show warning but let them proceed if they acknowledge, or stop them.
-        // The spec says: "Hizmet bölgesi dışındaki taleplerde müşteriye kibar ve profesyonel bir bilgilendirme gösterilmelidir."
+        // The spec says: "Bei Anfragen außerhalb des Einsatzgebiets sollte dem Kunden eine höfliche und professionelle Information angezeigt werden."
         // We will show warning, and block next step unless they are in service area. This ensures exact service area control.
         alert(postcodeCheck.message);
         return;

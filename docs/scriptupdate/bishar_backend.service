@@ -1,0 +1,16 @@
+[Unit]
+Description=Bishar Backend (uvicorn)
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/var/www/vhosts/plattenlegerallerart.ch/httpdocs/backend
+Environment="PATH=/var/www/vhosts/plattenlegerallerart.ch/httpdocs/backend/.venv/bin"
+ExecStart=/var/www/vhosts/plattenlegerallerart.ch/httpdocs/backend/.venv/bin/uvicorn server:app --host 127.0.0.1 --port 8000
+Restart=always
+RestartSec=5
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

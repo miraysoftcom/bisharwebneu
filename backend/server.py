@@ -50,6 +50,11 @@ db = client[db_name]
 
 # JWT Configuration
 JWT_SECRET = os.environ.get("JWT_SECRET", "9a4e05b9b6e8a04b1979b9a67e41ad9c3eeeaef618e0ab85db5dbfa7e8d2e8b0")
+JWT_SECRET = os.environ.get("JWT_SECRET")
+if not JWT_SECRET:
+    logger.critical("FATAL: JWT_SECRET environment variable is not set!")
+    raise ValueError("JWT_SECRET environment variable must be set for security.")
+
 JWT_ALGORITHM = "HS256"
 
 # Password Hashing
@@ -950,6 +955,78 @@ async def delete_page(page_id: str, current_user: dict = Depends(get_current_use
     await log_activity(current_user["email"], current_user["role"], f"Deleted CMS page {page_id}")
     return {"success": True}
 
+# --- ADMIN PROJECTS MANAGEMENT ---
+
+@api_router.get("/admin/projects", dependencies=[Depends(require_admin)])
+async def get_admin_projects():
+    projects = await db.projects.find({}).sort("order", 1).to_list(200)
+    return [serialize_doc(p) for p in projects]
+
+@api_router.post("/admin/projects", dependencies=[Depends(require_admin)])
+async def create_project(req: dict, current_user: dict = Depends(get_current_user)):
+    slug_norm = req.get("slug", "").lower().strip().replace(" ", "-")
+    existing = await db.projects.find_one({"slug": slug_norm})
+    if existing:
+        raise HTTPException(status_code=400, detail="Slug already exists for another project.")
+    project_doc = {
+        "title": req.get("title", ""),
+        "slug": slug_norm,
+        "category": req.get("category", "commercial"),
+        "image_url": req.get("image_url", ""),
+        "location": req.get("location", ""),
+        "duration": req.get("duration", ""),
+        "materials": req.get("materials", ""),
+        "works": req.get("works", ""),
+        "desc": req.get("desc", ""),
+        "active": req.get("active", True),
+        "featured": req.get("featured", False),
+        "order": int(req.get("order", 0)),
+        "created_at": datetime.now(timezone.utc)
+    }
+    res = await db.projects.insert_one(project_doc)
+    project_doc["_id"] = res.inserted_id
+    await log_activity(current_user["email"], current_user["role"], "Created project", new_val=project_doc["title"])
+    return serialize_doc(project_doc)
+
+@api_router.put("/admin/projects/{project_id}", dependencies=[Depends(require_admin)])
+async def update_project(project_id: str, req: dict, current_user: dict = Depends(get_current_user)):
+    existing = await db.projects.find_one({"_id": ObjectId(project_id)})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Project not found.")
+    slug_norm = req.get("slug", "").lower().strip().replace(" ", "-")
+    if slug_norm and slug_norm != existing.get("slug"):
+        conflict = await db.projects.find_one({"slug": slug_norm, "_id": {"$ne": ObjectId(project_id)}})
+        if conflict:
+            raise HTTPException(status_code=400, detail="Slug already exists for another project.")
+    project_doc = {
+        "title": req.get("title", existing.get("title", "")),
+        "slug": slug_norm or existing.get("slug", ""),
+        "category": req.get("category", existing.get("category", "commercial")),
+        "image_url": req.get("image_url", existing.get("image_url", "")),
+        "location": req.get("location", existing.get("location", "")),
+        "duration": req.get("duration", existing.get("duration", "")),
+        "materials": req.get("materials", existing.get("materials", "")),
+        "works": req.get("works", existing.get("works", "")),
+        "desc": req.get("desc", existing.get("desc", "")),
+        "active": req.get("active", existing.get("active", True)),
+        "featured": req.get("featured", existing.get("featured", False)),
+        "order": int(req.get("order", existing.get("order", 0)))
+    }
+    await db.projects.update_one({"_id": ObjectId(project_id)}, {"$set": project_doc})
+    await log_activity(current_user["email"], current_user["role"], f"Updated project {project_id}", old_val=existing.get("title"), new_val=project_doc["title"])
+    return {"success": True}
+
+@api_router.delete("/admin/projects/{project_id}", dependencies=[Depends(require_admin)])
+async def delete_project(project_id: str, current_user: dict = Depends(get_current_user)):
+    await db.projects.delete_one({"_id": ObjectId(project_id)})
+    await log_activity(current_user["email"], current_user["role"], f"Deleted project {project_id}")
+    return {"success": True}
+
+@api_router.get("/projects")
+async def get_projects():
+    projects = await db.projects.find({"active": True}).sort("order", 1).to_list(200)
+    return [serialize_doc(p) for p in projects]
+
 # --- HERO SLIDER MANAGEMENT ---
 
 @api_router.get("/sliders")
@@ -1232,7 +1309,7 @@ async def submit_callback(req: dict):
 # --- FILE UPLOADS ---
 
 @api_router.post("/quotes/upload")
-async def upload_quote_file(file: UploadFile = File(...)):
+async def upload_quote_file(request: Request, file: UploadFile = File(...)):
     ext = os.path.splitext(file.filename)[1].lower()
     allowed_exts = [".jpg", ".jpeg", ".png", ".webp", ".pdf", ".dwg", ".zip"]
     if ext not in allowed_exts:
@@ -1244,10 +1321,17 @@ async def upload_quote_file(file: UploadFile = File(...)):
     with open(target_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
         
+    # Build absolute URL for uploaded file depending on deployment
+    frontend_url = os.environ.get("FRONTEND_URL")
+    if frontend_url:
+        host = frontend_url.rstrip('/')
+    else:
+        host = str(request.base_url).rstrip('/')
+
     return {
         "filename": file.filename,
         "stored_name": unique_name,
-        "url": f"/uploads/{unique_name}",
+        "url": f"{host}/uploads/{unique_name}",
         "size": os.path.getsize(target_path)
     }
 

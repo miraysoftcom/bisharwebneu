@@ -28,6 +28,7 @@ export default function Kundenkonto() {
   const [isSigning, setIsSigning] = useState(false);
   const [signerName, setSignerName] = useState("");
   const [signerCompany, setSignerCompany] = useState("");
+  const [signatureText, setSignatureText] = useState("");
   const [agreedTerms, setAgreedTerms] = useState(false);
   const [submittingSign, setSubmittingSign] = useState(false);
 
@@ -50,7 +51,7 @@ export default function Kundenkonto() {
         fetchMyQuotes(response.data.user.email);
       }
     } catch (err) {
-      setLoginError(err.response?.data?.detail || "Giriş başarısız. Lütfen şifrenizi kontrol edin.");
+        setLoginError(err.response?.data?.detail || "Anmeldung fehlgeschlagen. Bitte überprüfen Sie Ihr Passwort.");
     } finally {
       setLoginLoading(false);
     }
@@ -107,8 +108,8 @@ export default function Kundenkonto() {
 
   const handleSignSubmit = async (e) => {
     e.preventDefault();
-    if (!signerName || !agreedTerms) {
-      alert("Bitte füllen Sie den Namen aus und stimmen Sie den AGB zu.");
+    if (!signerName || !signatureText.trim() || !agreedTerms) {
+      alert("Bitte füllen Sie alle erforderlichen Felder aus und stimmen Sie den AGB zu.");
       return;
     }
     setSubmittingSign(true);
@@ -118,20 +119,21 @@ export default function Kundenkonto() {
         signer_company: signerCompany,
         ip_address: "127.0.0.1",
         user_agent: navigator.userAgent,
-        signature_svg: "[SCREEN DRAWN DIGITAL SIGNATURE]" // Simulated canvas path
+        signature_svg: `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="80"><text x="10" y="40" font-size="24">${signatureText}</text></svg>`
       };
       
       const res = await axios.post(`${API}/quotes/token/${selectedQuote.secure_token}/accept`, payload);
       if (res.data.success) {
-        alert(`Sözleşme başarıyla imzalandı! Protokol numarası: ${res.data.contract_number}`);
+        alert(`Vertrag erfolgreich unterschrieben! Vertragsnummer: ${res.data.contract_number}`);
         setIsSigning(false);
+        setSignatureText("");
         // Reload details
         const updated = await axios.get(`${API}/quotes/token/${selectedQuote.secure_token}`);
         setSelectedQuote(updated.data);
         fetchMyQuotes(kundenUser.email);
       }
     } catch (err) {
-      alert("Hata oluştu.");
+      alert(err.response?.data?.detail || err.response?.data?.message || "Ein Fehler ist aufgetreten.");
     } finally {
       setSubmittingSign(false);
     }
@@ -157,7 +159,7 @@ export default function Kundenkonto() {
           <div className="text-center space-y-3">
             <User className="w-12 h-12 text-[#C5A880] mx-auto" />
             <h2 className="text-3xl font-black text-slate-900 tracking-tight">Kundenportal Anmeldung</h2>
-            <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Giriş yapın ve tekliflerinizi yönetin.</p>
+            <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Melden Sie sich an und verwalten Sie Ihre Offerten.</p>
           </div>
 
           <form onSubmit={handleKundenLogin} className="space-y-4">
@@ -339,7 +341,7 @@ export default function Kundenkonto() {
                 <div className="bg-slate-50 border border-slate-200 p-6 rounded space-y-4">
                   <div className="flex items-center space-x-2 border-b pb-2 border-slate-200">
                     <MessageCircle className="w-4 h-4 text-[#C5A880]" />
-                    <h4 className="text-xs font-black uppercase tracking-wider text-slate-700">İletişim ve Destek Odası</h4>
+                    <h4 className="text-xs font-black uppercase tracking-wider text-slate-700">Kontakt & Support</h4>
                   </div>
                   
                   <div className="space-y-3 max-h-40 overflow-y-auto border-b border-slate-200 pb-3">
@@ -348,7 +350,7 @@ export default function Kundenkonto() {
                         m.sender === "Client" ? "bg-slate-900 text-white ml-auto" : "bg-white text-slate-800 border"
                       }`}>
                         <span className="block text-[9px] font-black opacity-60 mb-1 uppercase tracking-widest">
-                          {m.sender === "Client" ? "İşveren (Siz)" : "Swiss Platten Temsilcisi"}
+                          {m.sender === "Client" ? "Auftraggeber (Sie)" : "Swiss Platten Vertreter"}
                         </span>
                         <p className="font-semibold">{m.message}</p>
                       </div>
@@ -356,14 +358,14 @@ export default function Kundenkonto() {
                   </div>
 
                   <form onSubmit={handleSendChatMessage} className="flex gap-2">
-                    <input 
+                      <input 
                       type="text" 
-                      placeholder="Bir soru yazın veya detayları konuşun..."
+                      placeholder="Stellen Sie eine Frage oder besprechen Sie Details..."
                       value={newChatMessage}
                       onChange={(e) => setNewChatMessage(e.target.value)}
                       className="w-full px-3 py-2 bg-white border border-slate-200 rounded text-xs"
                     />
-                    <button type="submit" className="bg-slate-900 text-white hover:bg-slate-850 px-4 py-2 text-xs font-bold uppercase rounded-sm">Gönder</button>
+                    <button type="submit" className="bg-slate-900 text-white hover:bg-slate-850 px-4 py-2 text-xs font-bold uppercase rounded-sm">Senden</button>
                   </form>
                 </div>
 
@@ -376,12 +378,12 @@ export default function Kundenkonto() {
                         className="bg-slate-900 text-[#C5A880] border border-[#C5A880] hover:bg-slate-850 font-black text-xs tracking-widest uppercase px-8 py-4 rounded-sm flex items-center space-x-2 shadow-xl"
                       >
                         <FileSignature className="w-4 h-4" />
-                        <span>Ich akzeptiere die Offerte (Teklifi İmzala)</span>
+                            <span>Ich akzeptiere die Offerte</span>
                       </button>
                     ) : (
                       <form onSubmit={handleSignSubmit} className="w-full max-w-lg bg-slate-50 border border-[#C5A880]/15 p-6 rounded space-y-4 font-semibold text-xs uppercase tracking-widest text-slate-500 animate-in zoom-in-95 duration-200">
                         <div className="space-y-1">
-                          <label>İmzalayan Adı & Soyadı *</label>
+                          <label>Vor- und Nachname des Unterzeichners *</label>
                           <input 
                             type="text" 
                             value={signerName}
@@ -392,7 +394,7 @@ export default function Kundenkonto() {
                           />
                         </div>
                         <div className="space-y-1">
-                          <label>Firma / Şirket Adı (Opsiyonel)</label>
+                          <label>Firma (optional)</label>
                           <input 
                             type="text" 
                             value={signerCompany}
@@ -404,9 +406,22 @@ export default function Kundenkonto() {
 
                         {/* Signature screen canvas placeholder */}
                         <div className="space-y-1.5 pt-2">
-                          <label>Ekran Üzerinde Dijital İmzanız</label>
+                          <label>Ihre digitale Unterschrift *</label>
+                          <input
+                            type="text"
+                            value={signatureText}
+                            onChange={(e) => setSignatureText(e.target.value)}
+                            placeholder="z. B. Max Muster"
+                            className="w-full px-3 py-2 bg-white border rounded text-xs text-slate-800"
+                            required
+                          />
+                          <p className="text-[10px] text-slate-400">Geben Sie hier Ihren Namen ein, um die digitale Signatur zu erzeugen.</p>
+                        </div>
+
+                        <div className="space-y-1.5 pt-2">
+                          <label>Simulierte Signatur-Vorschau</label>
                           <div className="border border-dashed border-slate-300 bg-white h-24 rounded flex items-center justify-center text-[10px] text-slate-400">
-                            İmzanızı fareniz veya parmağınızla buraya çizin [Simüle Edildi]
+                             Unterschrift mit Maus oder Finger hier zeichnen [Simuliert]
                           </div>
                         </div>
 
@@ -418,13 +433,15 @@ export default function Kundenkonto() {
                               onChange={(e) => setAgreedTerms(e.target.checked)}
                               className="w-4 h-4 text-red-600 rounded" required
                             />
-                            <span className="text-[10px] text-slate-650 leading-relaxed font-bold">Tüm İsviçre SIA handwerker ve AGB şartlarını kabul ediyorum. *</span>
+                            <span className="text-[10px] text-slate-650 leading-relaxed font-bold">
+                              Ich stimme den <a href="/agb" className="underline text-[#C5A880]">AGB</a> und der <a href="/datenschutz" className="underline text-[#C5A880]">Datenschutzerklärung</a> zu. *
+                            </span>
                           </label>
                         </div>
 
                         <div className="flex gap-4 pt-2">
-                          <button type="button" onClick={() => setIsSigning(false)} className="w-1/2 py-2.5 border text-slate-700 font-bold rounded-sm">İptal</button>
-                          <button type="submit" disabled={submittingSign} className="w-1/2 bg-slate-900 text-[#C5A880] border border-[#C5A880] font-black rounded-sm">{submittingSign ? "İmzalanıyor..." : "Sözleşmeyi İmzala"}</button>
+                          <button type="button" onClick={() => setIsSigning(false)} className="w-1/2 py-2.5 border text-slate-700 font-bold rounded-sm">Abbrechen</button>
+                            <button type="submit" disabled={submittingSign} className="w-1/2 bg-slate-900 text-[#C5A880] border border-[#C5A880] font-black rounded-sm">{submittingSign ? "Wird unterschrieben..." : "Vertrag unterschreiben"}</button>
                         </div>
                       </form>
                     )}
@@ -434,7 +451,7 @@ export default function Kundenkonto() {
               </div>
             ) : (
               <div className="bg-white border border-dashed border-slate-300 p-16 rounded-lg text-center font-bold text-slate-400">
-                Lütfen detayları incelemek için sol listeden bir teklif seçin.
+                Bitte wählen Sie links ein Angebot aus, um die Details anzusehen.
               </div>
             )}
           </div>

@@ -1,14 +1,34 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import axios from "axios";
 import { useLanguage } from "@/components/LanguageContext";
 import { MapPin, Clock, Calendar, CheckSquare, Layers, Eye, X } from "lucide-react";
 import { PORTFOLIO } from "@/constants/testIds";
+
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+const API = `${BACKEND_URL}/api`;
 
 export default function Portfolio() {
   const { t } = useLanguage();
   const [activeCategory, setActiveTab] = useState("all");
   const [lightboxImage, setLightboxImage] = useState(null);
+  const [projects, setProjects] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const projects = [
+  useEffect(() => {
+    const fetchPortfolioProjects = async () => {
+      try {
+        const res = await axios.get(`${API}/projects`);
+        setProjects(Array.isArray(res.data) ? res.data : []);
+      } catch (err) {
+        console.error("Portfolio fetch error", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchPortfolioProjects();
+  }, []);
+
+  const defaultProjects = [
     {
       id: "p1",
       title: "Luxuriöse Badezimmer-Oase",
@@ -64,9 +84,10 @@ export default function Portfolio() {
     { code: "commercial", label: t("portfolio.categories.commercial") }
   ];
 
-  const filteredProjects = activeCategory === "all" 
-    ? projects 
-    : projects.filter(p => p.category === activeCategory);
+  const displayedProjects = loading ? defaultProjects : projects;
+  const filteredProjects = activeCategory === "all"
+    ? displayedProjects
+    : displayedProjects.filter(p => p.category === activeCategory);
 
   const categoryLabels = {
     bathroom: "BADEZIMMER",

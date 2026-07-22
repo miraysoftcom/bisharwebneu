@@ -1,8 +1,46 @@
-# Debian için adım adım kurulum rehberi
+# Debian (basit adım adım rehber)
 
-Bu rehber Debian 12/13 üzerinde projeyi sıfırdan kurmak için hazırlanmıştır. Her adımı sırayla uygula.
+Bu rehber Debian 12/13 üzerinde projeyi kurman için sade ve adım adım hazırlandı. Her komutu terminale kopyala-yapıştır ve Enter tuşuna bas. Takılırsan bana yaz.
 
-## 1. Projeyi klonla
+Ön notlar:
+- `sudo` komutu yönetici izni ister; bilgisayar sahibi sana parola verebilir.
+- Bu proje için Python (FastAPI), Node.js (Next.js) ve MongoDB gerekiyor.
+
+1) Sistem güncelle
+
+```bash
+sudo apt update
+sudo apt upgrade -y
+```
+
+2) Gerekli araçları yükle
+
+```bash
+sudo apt install -y git curl ca-certificates gnupg lsb-release python3 python3-venv python3-pip build-essential
+```
+
+3) Node.js (örnek: 18/20) kur
+
+```bash
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt install -y nodejs
+node -v && npm -v
+```
+
+4) MongoDB (yerel) kur (basit adımlar)
+
+```bash
+wget -qO - https://pgp.mongodb.com/server-7.0.asc | sudo gpg -o /usr/share/keyrings/mongodb-server-7.0.gpg --dearmor
+echo "deb [ signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/debian bookworm/mongodb-org/7.0 main" | sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list
+sudo apt update
+sudo apt install -y mongodb-org
+sudo systemctl enable --now mongod
+sudo systemctl status mongod --no-pager
+```
+
+Ekranda `active (running)` görürsen MongoDB çalışıyor demektir.
+
+5) Projeyi klonla
 
 ```bash
 cd ~
@@ -10,49 +48,10 @@ git clone https://github.com/miraysoftcom/bisharwebneu.git
 cd bisharwebneu
 ```
 
-## 2. Sistem paketlerini güncelle
+6) Backend (Python) ortamı hazırlama
 
 ```bash
-sudo apt update
-sudo apt upgrade -y
-```
-
-## 3. Gerekli paketleri kur
-
-```bash
-sudo apt install -y git curl ca-certificates gnupg lsb-release python3 python3-venv python3-pip build-essential
-```
-
-## 4. Node.js 20 kur
-
-```bash
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-sudo apt install -y nodejs
-node -v
-npm -v
-```
-
-## 5. MongoDB 7 kur
-
-```bash
-curl -fsSL https://pgp.mongodb.com/server-7.0.asc | \
-  sudo gpg -o /usr/share/keyrings/mongodb-server-7.0.gpg --dearmor
-
-echo "deb [ signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/debian bookworm/mongodb-org/7.0 main" | \
-  sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list
-
-sudo apt update
-sudo apt install -y mongodb-org
-sudo systemctl enable --now mongod
-sudo systemctl status mongod --no-pager
-```
-
-MongoDB çalışıyorsa `active (running)` görünür.
-
-## 6. Backend ortamını kur
-
-```bash
-cd ~/bisharwebneu/backend
+cd backend
 python3 -m venv .venv
 source .venv/bin/activate
 pip install --upgrade pip
@@ -60,65 +59,45 @@ pip install -r requirements.txt
 cp .env.example .env
 ```
 
-`.env` dosyasını kontrol et:
+7) `.env` dosyasını düzenle (örnek değerler)
 
 ```bash
-sed -n '1,20p' .env
-```
+# editörle aç, örn: nano .env
+nano .env
 
-İstersen aşağıdaki değerlerle devam edebilirsin:
-
-```bash
+# Aşağıdakileri kontrol et veya ekle
 MONGO_URL=mongodb://localhost:27017
 DB_NAME=test_database
 JWT_SECRET=change-me
 FRONTEND_URL=http://localhost:3000
 ```
 
-## 7. Backend'i çalıştır
+8) Backend’i çalıştır (geliştirme)
 
 ```bash
 source .venv/bin/activate
-python -m uvicorn server:app --app-dir . --host 0.0.0.0 --port 8000
+python -m uvicorn server:app --app-dir . --host 127.0.0.1 --port 8000 --reload
 ```
 
-Başarılıysa bu adresi aç:
+Tarayıcıda `http://127.0.0.1:8000/docs` açılmalı.
 
-- http://localhost:8000/docs
-
-## 8. Frontend'i kur
+9) Frontend kur ve çalıştır
 
 ```bash
-cd ~/bisharwebneu/frontend
-npm install --legacy-peer-deps
+cd ../frontend
+npm install
 cat > .env.local <<'EOF'
-NEXT_PUBLIC_BACKEND_URL=http://localhost:8000
+NEXT_PUBLIC_BACKEND_URL=http://127.0.0.1:8000
 EOF
-```
-
-## 9. Frontend'i çalıştır
-
-```bash
 npm run dev -- --port 3000
 ```
 
-Başarılıysa bu adresi aç:
+Tarayıcıda `http://localhost:3000` aç.
 
-- http://localhost:3000
+10) Kontroller
 
-## 10. Son kontrol
+- `sudo systemctl status mongod --no-pager` ile MongoDB
+- `http://127.0.0.1:8000/docs` ile backend
+- `http://localhost:3000` ile frontend
 
-Aşağıdakileri kontrol et:
-
-- MongoDB çalışıyor mu?
-- Backend `http://localhost:8000/docs` açılıyor mu?
-- Frontend `http://localhost:3000` açılıyor mu?
-
-## 11. Sorun olursa
-
-```bash
-sudo systemctl status mongod --no-pager
-sudo systemctl restart mongod
-```
-
-İstersen bir sonraki adımda bu rehberi PDF olarak da kaydedebilirim.
+Sorun çıkarsa terminal çıktılarını buraya yapıştır, yardımcı olurum.
